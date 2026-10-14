@@ -5,7 +5,7 @@ import type { TraitCategory, TraitIcon } from './CardTraits.js';
  * Toute modification des règles ou du classement doit incrémenter ANALYSIS_VERSION
  * pour que les catalogues déjà importés soient recalculés.
  */
-export const ANALYSIS_VERSION = 7;
+export const ANALYSIS_VERSION = 8;
 
 const symbol = (name: string): TraitIcon => ({ type: 'symbol', name });
 

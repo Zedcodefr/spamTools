@@ -114,7 +114,9 @@ Clic gauche sur une carte de la galerie : l'ajouter au deck (4 cartes, sans doub
 au plus un talent par carte (aucun par défaut), et un **DPS** facultatif. L'analyse **simule la partie tour par tour, en espérance**,
 les 4 cartes agissant à chaque tour :
 
-- capacité de recharge N : utilisée une fois tous les N tours (Écho : chance de rester disponible) ;
+- capacité de recharge N : prête pour la première fois au tour N, puis N tours après chaque utilisation
+  (tour 1 : seules les recharges de 1 agissent) ; l'Écho la laisse prête au tour suivant avec sa chance,
+  suivie en probabilité ;
 - dégâts, soins et bonus élémentaires : × précision × (1 + chance de critique × (multiplicateur − 1)) ;
   « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
 - dégâts **totaux** (toutes cibles) et **cible unique** (reçus par une carte adverse donnée) : zone = 4 cibles,
@@ -128,9 +130,9 @@ les 4 cartes agissant à chaque tour :
   précision et critique plafonnées à 100 % ; talents « à chaque tour » appliqués à chaque tour ;
 - résistances moyennes des 4 cartes, talents permanents et bonus d'équipe compris ; faiblesse = la plus basse.
 
-Résultats en graphiques (SVG maison, couleurs validées pour les daltonismes contre le fond de l'app),
-les courbes partant de 0 (« Départ », avant l'application des talents) ; les données restent consultables
-en tableaux (« Voir les données »).
+Résultats en graphiques (SVG maison, couleurs validées pour les daltonismes contre le fond de l'app) :
+dégâts et soins par tour en barres (ce tour précis) superposées à leur cumul en courbe, partant de 0
+(« Départ », avant l'application des talents) ; les données restent consultables en tableaux.
 
 Les effets conditionnels, à usage limité ou en pourcentage de PV sont listés « non chiffrés ».
 Le modèle de chaque capacité est calculé à l'import (`computeCardStats`) ; l'analyse (`analyzeDeck`) simule.

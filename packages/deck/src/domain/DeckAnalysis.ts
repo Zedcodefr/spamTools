@@ -1,7 +1,9 @@
 /**
  * Analyse d'un deck : simulation tour par tour, en espérance, à partir du modèle chiffré de
  * chaque carte (calculé à l'import). Les 4 cartes agissent à chaque tour et utilisent chaque
- * capacité dès qu'elle est prête : une capacité de période P sert en moyenne 1 / P fois par tour.
+ * capacité dès qu'elle est prête. Une capacité de recharge N est prête pour la première fois au
+ * tour N, puis N tours après chaque utilisation ; l'Écho la laisse prête au tour suivant avec sa
+ * probabilité (suivie exactement : probabilité d'être prête à chaque tour).
  *
  * À chaque tour, dans l'ordre :
  * 1. renforts « à chaque tour » des talents, puis renforts des capacités utilisées ce tour ;
@@ -39,6 +41,8 @@ export interface Boost {
 
 export interface AbilityModel {
   readonly name: string;
+  readonly cooldown: number;
+  readonly echoChance: number;
   readonly period: number;
   readonly precision: number;
   readonly critChance: number;
@@ -179,6 +183,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
   const abilities = cards.map((card) => [...card.base.abilities, ...card.talent.abilities]);
   const boosts: CardBoosts[] = cards.map(() => ({ ...NO_BOOSTS }));
   const uses = abilities.map((list) => list.map(() => 0));
+  const schedules = abilities.map((list) => list.map((ability) => new CooldownSchedule(ability)));
   const perCard = cards.map(() => ({ damage: 0, singleTargetDamage: 0, heal: 0, generated: 0 }));
   const unappliedTargeted = new Set<string>();
 
@@ -218,14 +223,18 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
   const turns: TurnProjection[] = [];
 
   for (let turn = 1; turn <= turnCount; turn++) {
+    // Probabilité que chaque capacité soit prête, donc utilisée, à ce tour.
+    const ready = schedules.map((list) => list.map((schedule) => schedule.readyChance()));
+    const usedNow = (index: number, abilityIndex: number) => ready[index]?.[abilityIndex] ?? 0;
+
     // 1. Renforts du tour.
     cards.forEach((card, index) => {
       for (const boost of [...card.base.boostsPerTurn, ...card.talent.boostsPerTurn]) {
         applyBoost(index, boost, 1, card.talentName ?? card.cardName);
       }
-      abilities[index]?.forEach((ability) => {
+      abilities[index]?.forEach((ability, abilityIndex) => {
         for (const boost of ability.boosts) {
-          applyBoost(index, boost, 1 / ability.period, ability.name);
+          applyBoost(index, boost, usedNow(index, abilityIndex), ability.name);
         }
       });
     });
@@ -236,7 +245,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
     cards.forEach((card, index) => {
       const byCard = sum([card.base.passiveBonusPerTurn, card.talent.passiveBonusPerTurn]);
       abilities[index]?.forEach((ability, abilityIndex) => {
-        const rate = 1 / ability.period;
+        const rate = usedNow(index, abilityIndex);
         const growth = ability.growth.bonus * (uses[index]?.[abilityIndex] ?? 0);
         const factor = rate * successFactor(ability, boosts[index] as CardBoosts);
         for (const line of ability.bonus) {
@@ -258,7 +267,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
       const boostOf = (element: string) => 1 + BONUS_RATE * card.bonusFactor * (stock[element] ?? 0);
       abilities[index]?.forEach((ability, abilityIndex) => {
         const used = uses[index]?.[abilityIndex] ?? 0;
-        const factor = successFactor(ability, cardBoosts) / ability.period;
+        const factor = successFactor(ability, cardBoosts) * usedNow(index, abilityIndex);
         const effect = (
           lines: readonly EffectLine[],
           base: number,
@@ -281,10 +290,11 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
         cardTotals.singleTargetDamage += effect(ability.damage, damageBase, singleTargetDamage, (line) => line.singleTarget);
         cardTotals.heal += effect(ability.heal, ability.growth.heal * used + cardBoosts.baseHeal, heal, (line) => line.targets);
         // Croissance « après utilisation » : comptée à partir de l'utilisation suivante.
-        uses[index]![abilityIndex] = used + 1 / ability.period;
+        uses[index]![abilityIndex] = used + usedNow(index, abilityIndex);
       });
     });
 
+    schedules.forEach((list) => list.forEach((schedule) => schedule.endTurn()));
     addInto(totals.damage, damage);
     addInto(totals.singleTargetDamage, singleTargetDamage);
     addInto(totals.heal, heal);
@@ -342,6 +352,39 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
       }),
     ],
   };
+}
+
+/**
+ * Calendrier d'une capacité, en probabilités : `remaining[k]` = probabilité qu'il reste k tours
+ * avant qu'elle soit prête (0 : prête ce tour). Départ : prête au tour N (recharge N).
+ * Après utilisation : prête au tour suivant avec la chance d'Écho, sinon N tours plus tard.
+ */
+class CooldownSchedule {
+  private remaining: number[];
+  private readonly cooldown: number;
+  private readonly echo: number;
+
+  constructor(ability: AbilityModel) {
+    this.cooldown = Math.max(1, Math.round(ability.cooldown));
+    this.echo = Math.min(1, Math.max(0, ability.echoChance));
+    this.remaining = Array.from({ length: this.cooldown }, (_, k) => (k === this.cooldown - 1 ? 1 : 0));
+  }
+
+  readyChance(): number {
+    return this.remaining[0] ?? 0;
+  }
+
+  /** Fin du tour : la capacité prête est utilisée, les autres se rapprochent d'un tour. */
+  endTurn(): void {
+    const used = this.readyChance();
+    const next = this.remaining.map(() => 0);
+    for (let k = 1; k < this.remaining.length; k++) {
+      next[k - 1] = (next[k - 1] ?? 0) + (this.remaining[k] ?? 0);
+    }
+    next[0] = (next[0] ?? 0) + used * this.echo;
+    next[this.cooldown - 1] = (next[this.cooldown - 1] ?? 0) + used * (1 - this.echo);
+    this.remaining = next;
+  }
 }
 
 /** Espérance de réussite × critique d'une capacité, renforts compris (plafonnés à 100 %). */

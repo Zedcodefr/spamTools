@@ -51,7 +51,14 @@ export interface Boost {
 
 export interface AbilityModel {
   readonly name: string;
-  /** Tours moyens entre deux utilisations : recharge N -> tous les N tours (Écho : moins). */
+  /**
+   * Recharge N : la capacité est prête pour la première fois au tour N, puis N tours après
+   * chaque utilisation (une recharge de 1 sert à chaque tour, dès le tour 1).
+   */
+  readonly cooldown: number;
+  /** Écho : probabilité (0 à 1) qu'elle reste prête au tour suivant son utilisation. */
+  readonly echoChance: number;
+  /** Tours moyens entre deux utilisations en régime établi (indicatif). */
   readonly period: number;
   /** En % : précision, chance de critique ; multiplicateur des coups critiques. */
   readonly precision: number;

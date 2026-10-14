@@ -56,7 +56,7 @@ const line = (value: number, element = 'fire', targets = 1, singleTarget = 1) =>
 });
 
 const ability = (overrides: Partial<AbilityModel>): AbilityModel => ({
-  name: 'Capacité', period: 1, precision: 100, critChance: 0, critMultiplier: 2, damage: [], heal: [], bonus: [], cost: {},
+  name: 'Capacité', cooldown: 1, echoChance: 0, period: 1, precision: 100, critChance: 0, critMultiplier: 2, damage: [], heal: [], bonus: [], cost: {},
   growth: { damage: 0, heal: 0, bonus: 0 }, boosts: [], ...overrides,
 });
 
@@ -88,12 +88,30 @@ describe('analyzeDeck : simulation', () => {
   it('applique précision, critique (multiplicateur) et recharge', () => {
     const cards = [
       cardStats('a', { abilities: [ability({ damage: [line(10)], precision: 50, critChance: 50, critMultiplier: 3 })] }),
-      cardStats('b', { abilities: [ability({ damage: [line(20, 'water')], period: 2 })] }),
+      cardStats('b', { abilities: [ability({ damage: [line(20, 'water')], cooldown: 2 })] }),
     ];
-    // a : 10 × 0,5 × (1 + 0,5 × 2) = 10 ; b : 20 / 2 = 10
+    // a : 10 × 0,5 × (1 + 0,5 × 2) = 10 par tour ; b : 20 au tour 2 seulement, soit 10 par tour sur 2 tours
     const analysis = analyzeDeck(cards, { turns: 2 });
     assert.deepEqual(analysis.damagePerTurn, { fire: 10, water: 10 });
     assert.equal(analysis.totalDamagePerTurn, 20);
+  });
+
+  it('suit la recharge : prête au tour N, puis tous les N tours', () => {
+    const cards = [
+      cardStats('a', { abilities: [ability({ damage: [line(30)], cooldown: 3 })] }),
+      cardStats('b', { abilities: [ability({ heal: [line(70, 'light')], cooldown: 5 })] }),
+    ];
+    const analysis = analyzeDeck(cards, { turns: 7 });
+    assert.deepEqual(analysis.turns.map((turn) => turn.totalDamage), [0, 0, 30, 0, 0, 30, 0]);
+    assert.deepEqual(analysis.turns.map((turn) => turn.totalHeal), [0, 0, 0, 0, 70, 0, 0]);
+  });
+
+  it('suit l’Écho en probabilité : prête au tour suivant avec sa chance', () => {
+    const cards = [cardStats('a', { abilities: [ability({ damage: [line(10)], cooldown: 3, echoChance: 0.5 })] })];
+    // Probabilité d'être prête : tour 3 : 1 ; tour 4 : 0,5 (Écho) ; tour 5 : 0,25 ;
+    // tour 6 : 0,5 (tour 3 sans Écho) + 0,125 (Écho aux tours 4 et 5) = 0,625 ;
+    // tour 7 : 0,25 (tour 4 sans Écho) + 0,3125 (Écho au tour 6) = 0,5625.
+    assert.deepEqual(damageByTurn(cards, 7), [0, 0, 10, 5, 2.5, 6.25, 5.63]);
   });
 
   it('distingue dégâts totaux et cible unique : zone, cibles au hasard', () => {

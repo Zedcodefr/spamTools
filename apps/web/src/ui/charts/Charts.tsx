@@ -328,15 +328,175 @@ export function LineChart({ xs, xLabel, series, format, height = 180, maxY, comp
   );
 }
 
+interface ComboChartProps {
+  /** Abscisses : 0 (départ) puis 1..N. */
+  readonly xs: readonly number[];
+  readonly xLabel: (x: number) => string;
+  /** Une mesure : valeur à chaque abscisse (barre), et son cumul (courbe) calculé ici. */
+  readonly series: readonly (ChartSeries & { readonly values: readonly number[] })[];
+  readonly format: Format;
+  readonly height?: number;
+}
+
+/**
+ * Barres + courbe sur un seul axe (même unité) : la barre montre la valeur de chaque abscisse
+ * (ce tour précis), la courbe son cumul depuis le départ (0). Une couleur par mesure, partagée
+ * par sa barre et sa courbe ; survol d'une abscisse entière.
+ */
+export function ComboChart({ xs, xLabel, series, format, height = 200 }: ComboChartProps) {
+  const [hover, setHover] = useState<number | null>(null);
+  const padding = { left: 36, right: VALUE_GUTTER + 4, top: 12, bottom: 22 };
+  const plotWidth = WIDTH - padding.left - padding.right;
+  const step = plotWidth / Math.max(1, xs.length - 1);
+  const gap = 2;
+  const barWidth = Math.max(2, Math.min(10, (step * 0.7 - gap * (series.length - 1)) / series.length));
+  const cumulative = series.map((entry) => {
+    let total = 0;
+    return entry.values.map((value) => (total += value));
+  });
+  const yMax = niceCeil(Math.max(1, ...cumulative.flat(), ...series.flatMap((entry) => entry.values)));
+  const xOf = (index: number) => padding.left + index * step;
+  const yOf = (y: number) => padding.top + (1 - y / yMax) * (height - padding.top - padding.bottom);
+  const baseline = yOf(0);
+
+  return (
+    <div className="chart">
+      <ul className="chart-legend">
+        {series.map((entry) => (
+          <li key={entry.key}>
+            <span className="chart-legend__key chart-legend__key--bar" style={{ background: entry.color }} />
+            <span className="chart-legend__key chart-legend__key--line" style={{ background: entry.color }} />
+            {entry.label}
+          </li>
+        ))}
+        <li className="chart-legend__note">barre : ce tour · courbe : cumul</li>
+      </ul>
+      <div className="chart__frame">
+        <svg
+          viewBox={`0 0 ${WIDTH} ${height}`}
+          className="chart__svg"
+          role="img"
+          aria-hidden="true"
+          tabIndex={0}
+          onPointerMove={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * WIDTH;
+            setHover(Math.min(xs.length - 1, Math.max(0, Math.round((x - padding.left) / step))));
+          }}
+          onPointerLeave={() => setHover(null)}
+          onFocus={() => setHover(xs.length - 1)}
+          onBlur={() => setHover(null)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+              const delta = event.key === 'ArrowLeft' ? -1 : 1;
+              setHover((current) => Math.min(xs.length - 1, Math.max(0, (current ?? xs.length - 1) + delta)));
+            }
+          }}
+        >
+          {[0, yMax / 2, yMax].map((tick) => (
+            <g key={tick}>
+              <line className="chart__grid" x1={padding.left} x2={WIDTH - padding.right} y1={yOf(tick)} y2={yOf(tick)} />
+              <text className="chart__tick" x={padding.left - 4} y={yOf(tick) + 3} textAnchor="end">
+                {format(tick)}
+              </text>
+            </g>
+          ))}
+          <line className="chart__baseline" x1={padding.left} x2={WIDTH - padding.right} y1={baseline} y2={baseline} />
+          {hover !== null && (
+            <line className="chart__crosshair" x1={xOf(hover)} x2={xOf(hover)} y1={padding.top} y2={baseline} />
+          )}
+          {xs.map((x, index) => {
+            const groupWidth = series.length * barWidth + (series.length - 1) * gap;
+            return (
+              <g key={x}>
+                {series.map((entry, position) => {
+                  const value = entry.values[index] ?? 0;
+                  if (value <= 0) {
+                    return null;
+                  }
+                  const left = xOf(index) - groupWidth / 2 + position * (barWidth + gap);
+                  const top = yOf(value);
+                  const radius = Math.min(4, barWidth / 2, baseline - top);
+                  return (
+                    <path
+                      key={entry.key}
+                      fill={entry.color}
+                      opacity={hover === null || hover === index ? 0.85 : 0.5}
+                      d={`M${left},${baseline} V${top + radius} Q${left},${top} ${left + radius},${top} H${
+                        left + barWidth - radius
+                      } Q${left + barWidth},${top} ${left + barWidth},${top + radius} V${baseline} Z`}
+                    />
+                  );
+                })}
+                {(index === 0 || index === xs.length - 1 || x % 5 === 0) && (
+                  <text className="chart__tick" x={xOf(index)} y={height - 6} textAnchor="middle">
+                    {xLabel(x)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {series.map((entry, position) => {
+            const values = cumulative[position] ?? [];
+            const points = values.map((value, index) => `${xOf(index)},${yOf(value)}`).join(' ');
+            return (
+              <g key={entry.key}>
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke={entry.color}
+                  strokeWidth={2}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                {hover !== null && (
+                  <circle
+                    cx={xOf(hover)}
+                    cy={yOf(values[hover] ?? 0)}
+                    r={4}
+                    fill={entry.color}
+                    stroke="var(--chart-surface)"
+                    strokeWidth={2}
+                  />
+                )}
+                <text className="chart__value" x={xOf(xs.length - 1) + 6} y={yOf(values.at(-1) ?? 0) + 3}>
+                  {format(values.at(-1) ?? 0)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+        {hover !== null && (
+          <TooltipView
+            tooltip={{
+              x: Math.min(Math.max(xOf(hover), 80), WIDTH - 80),
+              y: 4,
+              title: xLabel(xs[hover] ?? 0),
+              rows: series.flatMap((entry, position) => [
+                { label: `${entry.label} ce tour`, value: format(entry.values[hover] ?? 0), color: entry.color },
+                {
+                  label: `${entry.label} cumulés`,
+                  value: format(cumulative[position]?.[hover] ?? 0),
+                  color: entry.color,
+                },
+              ]),
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Raccourcit un libellé à la largeur disponible (estimation : ~6 px par caractère à 11 px). */
 function truncate(label: string, width: number): string {
   const max = Math.max(4, Math.floor(width / 6));
   return label.length <= max ? label : `${label.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** Arrondi « propre » au-dessus de la valeur (1, 2, 5 × 10^n), pour des graduations lisibles. */
+/** Arrondi « propre » juste au-dessus de la valeur, pour des graduations lisibles sans trop de vide. */
 function niceCeil(value: number): number {
   const power = 10 ** Math.floor(Math.log10(value));
-  const step = [1, 2, 5, 10].find((candidate) => candidate * power >= value) ?? 10;
+  const step = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((candidate) => candidate * power >= value) ?? 10;
   return step * power;
 }

@@ -63,7 +63,7 @@ describe('computeCardStats', () => {
     assert.deepEqual(first?.damage, [{ value: 15, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1 }]);
     assert.deepEqual(first?.bonus, [{ value: 2, elements: { water: 1 }, targets: 1, singleTarget: 1, weight: 1 }]);
     assert.deepEqual([first?.period, first?.precision, first?.critChance, first?.critMultiplier], [1, 50, 25, 3]);
-    assert.equal(second?.period, 2);
+    assert.deepEqual([second?.cooldown, second?.echoChance, second?.period], [3, 0.5, 2]);
     assert.equal(second?.damage[0]?.targets, ENEMY_CARDS);
   });
 

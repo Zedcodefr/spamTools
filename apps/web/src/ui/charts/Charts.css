@@ -97,6 +97,11 @@
   gap: 0.35rem;
 }
 
+.chart-legend__note {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .chart-legend__key--bar {
   width: 10px;
   height: 10px;

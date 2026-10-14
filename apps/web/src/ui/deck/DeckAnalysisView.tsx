@@ -1,6 +1,6 @@
 import type { DeckAnalysis, ElementAmounts } from '../../domain/Deck.ts';
 import { useCardEnvironment } from '../card/CardEnvironment.tsx';
-import { BarChart, LineChart, type ChartCategory } from '../charts/Charts.tsx';
+import { BarChart, ComboChart, LineChart, type ChartCategory } from '../charts/Charts.tsx';
 import type { AnalysisState } from './DeckBuilderPage.tsx';
 
 const MAX_TURNS = 50;
@@ -100,7 +100,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
           tours
         </label>
       </h4>
-      <LineChart
+      <ComboChart
         xs={xs}
         xLabel={turnLabel}
         format={formatAxis}
@@ -112,11 +112,11 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
       {hasHeal && (
         <>
           <h4>Soins par tour</h4>
-          <LineChart
+          <ComboChart
             xs={xs}
             xLabel={turnLabel}
             format={formatAxis}
-            height={130}
+            height={150}
             series={[
               { key: 'heal', label: 'Soins', color: 'var(--chart-series-1)', values: along((turn) => turn.totalHeal) },
             ]}

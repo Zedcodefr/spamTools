@@ -207,6 +207,8 @@ function abilityModel(
 
   return {
     name: ability.name,
+    cooldown: Math.max(1, ability.cooldown),
+    echoChance: ability.cooldownResetChance / 100,
     period: expectedPeriod(ability),
     precision: ability.precision,
     critChance: ability.critChance,
