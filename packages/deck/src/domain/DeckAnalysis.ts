@@ -34,6 +34,8 @@ export interface EffectLine {
   /** Part reçue par une carte adverse donnée (zone : 1 ; cible au hasard parmi 4 : 1/4). */
   readonly singleTarget: number;
   readonly weight: number;
+  /** Effet déclenché seulement en cas de coup critique. */
+  readonly onCritOnly: boolean;
 }
 
 export type BoostStat = 'precision' | 'critChance' | 'critMultiplier' | 'baseDamage' | 'baseHeal';
@@ -307,9 +309,13 @@ function simulate(
       abilities[index]?.forEach((ability, abilityIndex) => {
         const rate = usedNow(index, abilityIndex);
         const growth = ability.growth.bonus * (uses[index]?.[abilityIndex] ?? 0);
-        const factor = rate * successFactor(ability, boosts[index] as CardBoosts);
+        const cardBoosts = boosts[index] as CardBoosts;
         for (const line of ability.bonus) {
-          addInto(byCard, scale(line.elements, (line.value + growth) * line.weight * factor));
+          // Bonus « en cas de coup critique » : précision × chance de critique ; sinon espérance de critique.
+          const chance = line.onCritOnly
+            ? hitChance(ability, cardBoosts) * critChance(ability, cardBoosts)
+            : successFactor(ability, cardBoosts);
+          addInto(byCard, scale(line.elements, (line.value + growth) * line.weight * rate * chance));
         }
         addInto(consumed, scale(ability.cost, rate));
       });
@@ -452,10 +458,15 @@ function hitChance(ability: AbilityModel, boosts: CardBoosts): number {
   return clampRatio((ability.precision + boosts.precision) / 100);
 }
 
+/** Chance de coup critique d'une capacité, renforts compris (plafonnée à 100 %). */
+function critChance(ability: AbilityModel, boosts: CardBoosts): number {
+  return clampRatio((ability.critChance + boosts.critChance) / 100);
+}
+
 /** Espérance de réussite × critique d'une capacité, renforts compris (plafonnés à 100 %). */
 function successFactor(ability: AbilityModel, boosts: CardBoosts): number {
   const hit = hitChance(ability, boosts);
-  const crit = clampRatio((ability.critChance + boosts.critChance) / 100);
+  const crit = critChance(ability, boosts);
   return hit * (1 + crit * (ability.critMultiplier + boosts.critMultiplier - 1));
 }
 

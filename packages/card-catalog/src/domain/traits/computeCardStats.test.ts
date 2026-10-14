@@ -31,7 +31,7 @@ function card(overrides: Partial<CardData>): CardData {
 
 const context: StatsContext = {
   baseElements: BASE,
-  elementIdByName: new Map([['feu', 'fire'], ['ombre', 'shadow'], ['nature', 'nature']]),
+  elementIdByName: new Map([['feu', 'fire'], ['eau', 'water'], ['ombre', 'shadow'], ['nature', 'nature']]),
   grantedPassive: (granted) =>
     granted.grantsSkill === 'CoeurFeu_C'
       ? { key: 'cœur de feu', label: 'Cœur de feu', description: 'Bonus Feu (+1) par tour de jeu' }
@@ -60,8 +60,8 @@ describe('computeCardStats', () => {
       // Écho 50 % : disponible au tour suivant une fois sur deux -> période moyenne 0,5 × 1 + 0,5 × 3 = 2.
       ability([action('DamageAll', 'damage', 'shadow', 10)], { cooldown: 3, cooldownResetChance: 50 }),
     ]);
-    assert.deepEqual(first?.damage, [{ value: 15, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1 }]);
-    assert.deepEqual(first?.bonus, [{ value: 2, elements: { water: 1 }, targets: 1, singleTarget: 1, weight: 1 }]);
+    assert.deepEqual(first?.damage, [{ value: 15, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1, onCritOnly: false }]);
+    assert.deepEqual(first?.bonus, [{ value: 2, elements: { water: 1 }, targets: 1, singleTarget: 1, weight: 1, onCritOnly: false }]);
     assert.deepEqual([first?.period, first?.precision, first?.critChance, first?.critMultiplier], [1, 50, 25, 3]);
     assert.deepEqual([second?.cooldown, second?.echoChance, second?.period], [3, 0.5, 2]);
     assert.equal(second?.damage[0]?.targets, ENEMY_CARDS);
@@ -97,6 +97,15 @@ describe('computeCardStats', () => {
         ?.bonus[0]?.elements,
       Object.fromEntries(BASE.map((element) => [element, 1 / 6])),
     );
+  });
+
+  it('repère un bonus réservé aux coups critiques', () => {
+    const [ability1] = model([
+      ability([action('damage', 'damage', 'water', 10), action('AddAllPlayerAttack', 'other', 'water', 2), action('AddAllPlayerAttack', 'other', 'fire', 1)], {
+        effect: 'Attaque 10 Eau\n+ Bonus Eau (+2) en cas de coup critique\nBonus Feu (+1)',
+      }),
+    ]);
+    assert.deepEqual(ability1?.bonus.map((line) => line.onCritOnly), [true, false]);
   });
 
   it('relève les croissances par utilisation', () => {

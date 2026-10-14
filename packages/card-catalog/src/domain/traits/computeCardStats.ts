@@ -151,9 +151,11 @@ function abilityModel(
       continue;
     }
     const value = (action.min + action.max) / 2;
-    const line = (targeting: keyof typeof TARGETING = 'single'): EffectLine | undefined => {
+    const line = (targeting: keyof typeof TARGETING = 'single', onCritOnly = false): EffectLine | undefined => {
       const elements = elementShares(action, card, text, context);
-      return Object.keys(elements).length === 0 ? undefined : { value, elements, weight, ...TARGETING[targeting] };
+      return Object.keys(elements).length === 0
+        ? undefined
+        : { value, elements, weight, onCritOnly, ...TARGETING[targeting] };
     };
 
     if (action.kind === 'damage') {
@@ -174,7 +176,7 @@ function abilityModel(
         heal.push(healLine);
       }
     } else if (BONUS_EFFECT.test(action.effect)) {
-      const bonusLine = line();
+      const bonusLine = line('single', isCritOnlyBonus(action, ability.effect, context));
       if (bonusLine !== undefined) {
         bonus.push(bonusLine);
       }
@@ -220,6 +222,20 @@ function abilityModel(
     growth,
     boosts,
   };
+}
+
+/**
+ * Bonus réservé aux coups critiques : une ligne du texte dit « Bonus <élément> … en cas de coup critique »
+ * pour l'élément de l'action.
+ */
+function isCritOnlyBonus(action: CardAction, effect: string, context: StatsContext): boolean {
+  if (action.element === null) {
+    return false;
+  }
+  const names = [...context.elementIdByName].filter(([, id]) => id === action.element).map(([name]) => name);
+  return normalize(effect)
+    .split('\n')
+    .some((line) => ON_CRIT.test(line) && /bonus/.test(line) && names.some((name) => line.includes(name)));
 }
 
 function damageTargeting(action: CardAction, text: string): keyof typeof TARGETING {

@@ -52,7 +52,7 @@ const empty: StatContribution = {
 };
 
 const line = (value: number, element = 'fire', targets = 1, singleTarget = 1) => ({
-  value, elements: { [element]: 1 }, targets, singleTarget, weight: 1,
+  value, elements: { [element]: 1 }, targets, singleTarget, weight: 1, onCritOnly: false,
 });
 
 const ability = (overrides: Partial<AbilityModel>): AbilityModel => ({
@@ -156,6 +156,13 @@ describe('analyzeDeck : simulation', () => {
     const cards = [cardStats('a', { abilities: [ability({ damage: [line(10)], boosts: [critBoost] })] })];
     // critique 10 %, puis 20 % : 10 × 1,1 ; 10 × 1,2
     assert.deepEqual(damageByTurn(cards, 2), [11, 12]);
+  });
+
+  it('ne génère un bonus « en cas de coup critique » qu’avec la chance de critique', () => {
+    const critBonus = { ...line(2, 'water'), onCritOnly: true };
+    const cards = [cardStats('a', { abilities: [ability({ bonus: [critBonus], critChance: 25 })] })];
+    // 2 × 25 % = 0,5 eau par tour.
+    assert.deepEqual(analyzeDeck(cards, { turns: 2 }).turns.map((turn) => turn.bonusStock['water']), [0.5, 1]);
   });
 
   it('ne compte un renfort que si la capacité qui le lance touche (précision)', () => {

@@ -13,7 +13,7 @@ const empty: StatContribution = {
   abilities: [
     {
       name: 'Attaque', cooldown: 1, echoChance: 0, period: 1, precision: 100, critChance: 0, critMultiplier: 2, heal: [], bonus: [], cost: {}, boosts: [],
-      damage: [{ value: 10, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1 }], growth: { damage: 0, heal: 0, bonus: 0 },
+      damage: [{ value: 10, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1, onCritOnly: false }], growth: { damage: 0, heal: 0, bonus: 0 },
     },
   ],
 };

@@ -31,6 +31,8 @@ export interface EffectLine {
   readonly singleTarget: number;
   /** Poids de la ligne : 1, ou 1 / nombre d'options pour une capacité à « Choix ». */
   readonly weight: number;
+  /** Effet déclenché seulement en cas de coup critique (« + Bonus Eau (+2) en cas de coup critique »). */
+  readonly onCritOnly: boolean;
 }
 
 export type BoostStat = 'precision' | 'critChance' | 'critMultiplier' | 'baseDamage' | 'baseHeal';
