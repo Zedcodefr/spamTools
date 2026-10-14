@@ -29,6 +29,9 @@ const provider: DeckCardStatsProvider = {
       return { cardId: slot.cardId, cardName: slot.cardId, talentName: 't', base: empty, talent, bonusFactor: 1 };
     });
   },
+  async candidates() {
+    return [];
+  },
 };
 
 const slots = (...ids: string[]) => ids.map((cardId) => ({ cardId, talentSlot: 1 }));

@@ -282,3 +282,78 @@
   text-align: left;
   color: var(--text-muted);
 }
+
+.deck-suggestions {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--surface-raised);
+}
+
+.deck-suggestions h3 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.deck-suggestions p {
+  margin: 0 0 0.5rem;
+}
+
+.deck-suggestions__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.deck-suggestions__controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.deck-suggestions__weight {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.deck-suggestions__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deck-suggestions__list > li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  font-size: 0.8rem;
+}
+
+.deck-suggestions__cards {
+  display: flex;
+  flex-direction: column;
+  grid-column: 1;
+}
+
+.deck-suggestions__figures {
+  grid-column: 1;
+  margin: 0 !important;
+  color: var(--text-muted);
+}
+
+.deck-suggestions__list button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}

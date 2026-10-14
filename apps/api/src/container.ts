@@ -8,7 +8,7 @@ import {
 } from '@spamtools/card-catalog';
 import { FileSystemAssetStore, SpamGameCatalogSource } from '@spamtools/card-catalog/infrastructure';
 import { MigrateDatabase } from '@spamtools/database';
-import { AnalyzeDeck, DeleteDeck, GetDeck, ListDecks, SaveDeck } from '@spamtools/deck';
+import { AnalyzeDeck, DeleteDeck, GetDeck, ListDecks, SaveDeck, SuggestDecks } from '@spamtools/deck';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
 import { SqliteCatalogRepository } from './adapters/catalog/SqliteCatalogRepository.js';
 import { CatalogDeckCardStatsProvider } from './adapters/deck/CatalogDeckCardStatsProvider.js';
@@ -52,6 +52,7 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     getDeck: new GetDeck(decks),
     deleteDeck: new DeleteDeck(decks),
     analyzeDeck: new AnalyzeDeck(deckCards),
+    suggestDecks: new SuggestDecks(deckCards),
     close: () => database.close(),
   };
 }

@@ -29,6 +29,16 @@ interface DeckBody {
   dpsCardId?: string | null;
 }
 
+interface SuggestionBody {
+  version: string;
+  slots: { cardId: string; talentSlot: number | null }[];
+  damage: 'total' | 'single';
+  healWeight: number;
+  turns?: number;
+  excludedCardIds?: string[];
+  count?: number;
+}
+
 interface AnalysisBody {
   version: string;
   slots: { cardId: string; talentSlot: number | null }[];
@@ -58,6 +68,29 @@ export async function deckRoutes(app: FastifyInstance, { container }: { containe
     await container.deleteDeck.execute({ id: request.params.id });
     return reply.code(204).send();
   });
+
+  // Autocomplétion : complète les cartes données pour maximiser dégâts, soins ou un compromis.
+  app.post<{ Body: SuggestionBody }>(
+    '/api/decks/suggestions',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['version', 'slots', 'damage', 'healWeight'],
+          properties: {
+            version: { type: 'string' },
+            slots: slotsSchema,
+            damage: { enum: ['total', 'single'] },
+            healWeight: { type: 'number', minimum: 0, maximum: 1 },
+            turns: { type: 'integer', minimum: 1, maximum: 50 },
+            excludedCardIds: { type: 'array', items: { type: 'string' } },
+            count: { type: 'integer', minimum: 1, maximum: 10 },
+          },
+        },
+      },
+    },
+    (request) => container.suggestDecks.execute({ ...request.body, turns: request.body.turns ?? 10, language }),
+  );
 
   // Analyse d'une composition, enregistrée ou non (POST : la composition est dans le corps).
   app.post<{ Body: AnalysisBody }>(

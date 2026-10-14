@@ -1,5 +1,11 @@
 import { CatalogVersion, NotFoundError, type CatalogRepository } from '@spamtools/card-catalog';
-import { NO_CONTRIBUTION, type DeckCardStats, type DeckCardStatsProvider, type DeckSlot } from '@spamtools/deck';
+import {
+  NO_CONTRIBUTION,
+  type CandidateCard,
+  type DeckCardStats,
+  type DeckCardStatsProvider,
+  type DeckSlot,
+} from '@spamtools/deck';
 
 /**
  * Adaptateur : relie le port du package deck au catalogue des cartes. Les statistiques
@@ -8,11 +14,25 @@ import { NO_CONTRIBUTION, type DeckCardStats, type DeckCardStatsProvider, type D
 export class CatalogDeckCardStatsProvider implements DeckCardStatsProvider {
   constructor(private readonly catalogs: CatalogRepository) {}
 
+  async candidates(version: string, language: string): Promise<CandidateCard[]> {
+    const catalog = await this.catalog(version, language);
+    return catalog.cards.map((card) => {
+      const { stats } = catalog.traitsOf(card);
+      return {
+        cardId: card.id.value,
+        cardName: card.name,
+        base: stats.base,
+        bonusFactor: stats.bonusFactor,
+        talents: card.data.talents.flatMap((talent) => {
+          const contribution = stats.talents[String(talent.slot)];
+          return contribution === undefined ? [] : [{ slot: talent.slot, name: talent.name, contribution }];
+        }),
+      };
+    });
+  }
+
   async statsFor(version: string, language: string, slots: readonly DeckSlot[]): Promise<DeckCardStats[]> {
-    const catalog = await this.catalogs.find(language, CatalogVersion.of(version));
-    if (catalog === undefined) {
-      throw new NotFoundError(`Aucun catalogue importé pour ${version} en "${language}"`);
-    }
+    const catalog = await this.catalog(version, language);
     return slots.map((slot) => {
       const card = catalog.findCard(slot.cardId);
       if (card === undefined) {
@@ -30,5 +50,13 @@ export class CatalogDeckCardStatsProvider implements DeckCardStatsProvider {
       }
       return { ...base, talentName: talent.name, talent: talentStats };
     });
+  }
+
+  private async catalog(version: string, language: string) {
+    const catalog = await this.catalogs.find(language, CatalogVersion.of(version));
+    if (catalog === undefined) {
+      throw new NotFoundError(`Aucun catalogue importé pour ${version} en "${language}"`);
+    }
+    return catalog;
   }
 }

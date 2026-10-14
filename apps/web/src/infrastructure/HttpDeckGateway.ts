@@ -1,5 +1,5 @@
 import type { DeckGateway, DeckToSave } from '../application/ports/DeckGateway.ts';
-import type { DeckAnalysis, DeckSlot, DeckView } from '../domain/Deck.ts';
+import type { DeckAnalysis, DeckSlot, DeckSuggestion, DeckView, SuggestionObjective } from '../domain/Deck.ts';
 
 /**
  * Adaptateur : implémente le port en appelant l'API (apps/api).
@@ -25,6 +25,15 @@ export class HttpDeckGateway implements DeckGateway {
 
   analyze(version: string, slots: readonly DeckSlot[], turns: number, dpsCardId: string | null): Promise<DeckAnalysis> {
     return this.request('POST', '/decks/analysis', { version, slots, turns, dpsCardId });
+  }
+
+  suggest(
+    version: string,
+    slots: readonly DeckSlot[],
+    objective: SuggestionObjective,
+    turns: number,
+  ): Promise<{ readonly suggestions: readonly DeckSuggestion[]; readonly complete: boolean }> {
+    return this.request('POST', '/decks/suggestions', { version, slots, turns, ...objective });
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {

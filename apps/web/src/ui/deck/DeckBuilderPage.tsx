@@ -17,6 +17,7 @@ import { useGateways } from '../GatewaysContext.tsx';
 import { CardGallery } from '../spamdex/CardGallery.tsx';
 import type { CatalogData } from '../useCatalogData.ts';
 import { DeckAnalysisView } from './DeckAnalysisView.tsx';
+import { DeckSuggestions } from './DeckSuggestions.tsx';
 import './DeckBuilder.css';
 
 const DEFAULT_TURNS = 10;
@@ -155,6 +156,17 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
             {message.text}
           </p>
         )}
+
+        <DeckSuggestions
+          version={data.catalog.version}
+          draft={draft}
+          turns={turns}
+          cardsById={cardsById}
+          onApply={(suggestion) => {
+            setDraft({ ...draft, slots: suggestion.slots, dpsCardId: suggestion.dpsCardId });
+            setMessage(null);
+          }}
+        />
 
         <ol className="deck-panel__slots">
           {Array.from({ length: DECK_SIZE }, (_, index) => {

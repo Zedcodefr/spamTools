@@ -46,6 +46,7 @@ Routes (lecture seule ; sans `version`, la plus récente importée est servie) :
 | `GET /api/assets/<chemin>`    | Images (chemins renvoyés par les routes ci-dessus)             |
 | `GET/POST /api/decks`, `GET/PUT/DELETE /api/decks/:id` | Decks enregistrés                     |
 | `POST /api/decks/analysis`    | Analyse d'une composition `{ version, slots, turns }`          |
+| `POST /api/decks/suggestions` | Autocomplétion `{ version, slots, damage, healWeight, turns }` |
 
 ## apps/web (React)
 
@@ -139,3 +140,11 @@ Bonus « par coup reçu » (Sac de frappe : +1 dans l'élément de la carte) : f
 
 Les effets conditionnels, à usage limité ou en pourcentage de PV sont listés « non chiffrés ».
 Le modèle de chaque capacité est calculé à l'import (`computeCardStats`) ; l'analyse (`analyzeDeck`) simule.
+
+**Autocomplétion (« Compléter le deck »)** : garde les cartes déjà choisies (et leur talent s'il est choisi)
+et complète le deck, DPS compris, pour maximiser dégâts^(1 − p) × soins^p, avec la mesure de dégâts au choix
+(totaux ou cible unique) et p la part des soins (0 % : dégâts seuls, 100 % : soins seuls ; entre les deux,
+un compromis qui exige les deux). Recherche (`searchDecks`) : construction carte par carte en gardant les
+meilleurs candidats, puis remplacements successifs, dans un budget de quelques secondes ; les talents sans
+effet chiffré sont fusionnés avec « aucun talent », le DPS n'est essayé que si un renfort ciblé existe.
+

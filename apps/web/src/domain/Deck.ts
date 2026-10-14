@@ -139,3 +139,19 @@ export interface DeckAnalysis {
     readonly turns: readonly TurnProjection[];
   } | null;
 }
+
+/** Deck proposé par l'autocomplétion (POST /api/decks/suggestions). */
+export interface DeckSuggestion {
+  readonly slots: readonly DeckSlot[];
+  readonly dpsCardId: string | null;
+  readonly score: number;
+  readonly totalDamagePerTurn: number;
+  readonly totalSingleTargetDamagePerTurn: number;
+  readonly totalHealPerTurn: number;
+}
+
+/** Objectif de l'autocomplétion : dégâts^(1 − healWeight) × soins^healWeight. */
+export interface SuggestionObjective {
+  readonly damage: 'total' | 'single';
+  readonly healWeight: number;
+}

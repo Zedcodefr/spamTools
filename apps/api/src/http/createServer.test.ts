@@ -132,6 +132,22 @@ describe('API catalogue', () => {
       assert.equal(analysis.json().cards[0].talentName, null);
     });
 
+    it('complète une sélection de départ', async () => {
+      const response = await send('POST', '/api/decks/suggestions', {
+        version: '1.10',
+        slots: [],
+        damage: 'total',
+        healWeight: 0,
+        turns: 3,
+      });
+      assert.equal(response.statusCode, 200);
+      const [best] = response.json().suggestions;
+      // Le catalogue de test n'a que 2 cartes : le deck proposé les contient.
+      assert.equal(best.slots.length, 2);
+      assert.ok(best.totalDamagePerTurn > 0);
+      assert.equal((await send('POST', '/api/decks/suggestions', { version: '1.10', slots: [], damage: 'x', healWeight: 0 })).statusCode, 400);
+    });
+
     it('analyse une composition avec la projection des bonus', async () => {
       const response = await send('POST', '/api/decks/analysis', {
         version: '1.10',
