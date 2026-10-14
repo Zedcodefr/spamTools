@@ -1,0 +1,106 @@
+.game-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.game-card__frame {
+  position: relative;
+  /* L'orbe d'élément, le spamton et la gemme débordent du cadre : pas de découpe ici. */
+  overflow: visible;
+  border-radius: 6%;
+  cursor: context-menu;
+  outline-offset: 6px;
+  transition: transform 120ms ease;
+}
+
+.game-card__frame:hover {
+  transform: translateY(-3px);
+}
+
+.game-card__frame:focus-visible {
+  outline: 3px solid var(--accent);
+}
+
+.game-card__face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  user-select: none;
+}
+
+.game-card__clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.game-card__artwork,
+.game-card__layer,
+.game-card__header,
+.game-card__name,
+.game-card__row,
+.game-card__hp,
+.game-card__label {
+  position: absolute;
+}
+
+.game-card__artwork {
+  object-fit: cover;
+  object-position: top;
+}
+
+.game-card__layer {
+  background-repeat: no-repeat;
+}
+
+.game-card__name {
+  text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.game-card__label {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.game-card__name,
+.game-card__label {
+  text-shadow:
+    0 0 6px rgb(4 2 12 / 0.9),
+    0 3px 4px rgb(4 2 12 / 0.9);
+}
+
+.game-card__hp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.game-card__border {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.game-card__credit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-card__credit a {
+  color: inherit;
+}

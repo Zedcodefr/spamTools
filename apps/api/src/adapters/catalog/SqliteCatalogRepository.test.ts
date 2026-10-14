@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
-import { CatalogVersion, SyncCatalog, type AssetStore } from '@spamtools/card-catalog';
+import { ANALYSIS_VERSION, CatalogVersion, SyncCatalog, type AssetStore } from '@spamtools/card-catalog';
 import { MigrateDatabase } from '@spamtools/database';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
 import { migrations } from '../../migrations.js';
@@ -37,6 +37,34 @@ describe('SqliteCatalogRepository', () => {
       stored.cards.map((card) => card.data),
       expected.cards.map((card) => card.data),
     );
+  });
+
+  it('enregistre les caractéristiques calculées à l’import et les relit sans recalcul', async () => {
+    const source = fakeSource();
+    await new SyncCatalog(source, repository, noAssets).execute({ language: 'fr' });
+    const expected = (await source.fetchCatalog(CatalogVersion.of('1.10'), 'fr')).catalog.traits;
+
+    const stored = await new SqliteCatalogRepository(database).find('fr', CatalogVersion.of('1.10'));
+
+    assert.deepEqual(stored?.traits, expected);
+    assert.equal(await repository.analysisVersion(CatalogVersion.of('1.10'), 'fr'), ANALYSIS_VERSION);
+    const rows = database.connection
+      .prepare("SELECT card_id FROM card_trait WHERE version = '1.10' AND kind = 'strike' AND value = 'fire'")
+      .all();
+    assert.equal(rows.length, 1);
+  });
+
+  it("recalcule des caractéristiques d'anciennes règles, puis les remplace à la synchro", async () => {
+    const sync = new SyncCatalog(fakeSource(), repository, noAssets);
+    await sync.execute({ language: 'fr' });
+    database.connection.exec("UPDATE catalog SET analysis_version = 0; DELETE FROM card_trait");
+
+    const recomputed = await new SqliteCatalogRepository(database).find('fr');
+    assert.ok(recomputed?.traits.byCard['18bca5cf-7aa1-421c-85ec-4ed0b6a8ca70']?.strikeElements.includes('fire'));
+
+    assert.equal((await sync.execute({ language: 'fr' })).status, 'reanalyzed');
+    assert.equal(await repository.analysisVersion(CatalogVersion.of('1.10'), 'fr'), ANALYSIS_VERSION);
+    assert.ok((database.connection.prepare('SELECT COUNT(*) AS n FROM card_trait').get()?.['n'] as number) > 0);
   });
 
   it('conserve le document brut et le plan de carte', async () => {

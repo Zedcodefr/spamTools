@@ -1,5 +1,5 @@
 import { DomainError, type UseCase } from '@spamtools/shared-kernel';
-import { CatalogVersion, type AssetPath } from '../domain/index.js';
+import { ANALYSIS_VERSION, CatalogVersion, type AssetPath, type Catalog } from '../domain/index.js';
 import { forEachConcurrently } from './forEachConcurrently.js';
 import type { AssetStore, CatalogRepository, CatalogSource } from './ports/index.js';
 
@@ -31,8 +31,11 @@ export interface AssetSyncReport {
 export interface SyncCatalogOutput {
   readonly version: string;
   readonly language: string;
-  /** `unchanged` : cette version était déjà en base (les images manquantes sont tout de même récupérées). */
-  readonly status: 'imported' | 'unchanged';
+  /**
+   * `unchanged` : cette version était déjà en base (les images manquantes sont tout de même récupérées) ;
+   * `reanalyzed` : déjà en base, mais ses caractéristiques ont été recalculées (règles d'analyse modifiées).
+   */
+  readonly status: 'imported' | 'unchanged' | 'reanalyzed';
   readonly cardCount: number;
   readonly assets: AssetSyncReport;
 }
@@ -71,19 +74,29 @@ export class SyncCatalog implements UseCase<SyncCatalogInput, SyncCatalogOutput>
     // (hors celles que la source n'a pas pu fournir, signalées dans le rapport).
     const assets = await this.syncAssets(catalog.assetPaths(), layout.assetPaths(catalog));
 
-    const alreadyImported = await this.repository.has(version, input.language);
-    if (!alreadyImported) {
-      await this.repository.save(catalog, rawDocument);
-    }
+    // Les caractéristiques des cartes sont calculées ici, une fois, puis enregistrées.
+    const status = await this.store(catalog, rawDocument);
     await this.repository.saveLayout(layout);
 
     return {
       version: version.value,
       language: input.language,
-      status: alreadyImported ? 'unchanged' : 'imported',
+      status,
       cardCount: catalog.cards.length,
       assets,
     };
+  }
+
+  private async store(catalog: Catalog, rawDocument: string): Promise<SyncCatalogOutput['status']> {
+    if (!(await this.repository.has(catalog.version, catalog.language))) {
+      await this.repository.save(catalog, rawDocument);
+      return 'imported';
+    }
+    if ((await this.repository.analysisVersion(catalog.version, catalog.language)) !== ANALYSIS_VERSION) {
+      await this.repository.saveTraits(catalog);
+      return 'reanalyzed';
+    }
+    return 'unchanged';
   }
 
   private async syncAssets(

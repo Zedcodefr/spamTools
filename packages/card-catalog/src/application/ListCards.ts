@@ -1,5 +1,6 @@
 import type { UseCase } from '@spamtools/shared-kernel';
-import { CatalogVersion, type CardData } from '../domain/index.js';
+import { CatalogVersion } from '../domain/index.js';
+import { toCardView, type CardView } from './CardView.js';
 import { NotFoundError } from './errors.js';
 import type { CatalogRepository } from './ports/index.js';
 
@@ -15,7 +16,7 @@ export interface ListCardsInput {
 export interface ListCardsOutput {
   readonly version: string;
   readonly language: string;
-  readonly cards: readonly CardData[];
+  readonly cards: readonly CardView[];
 }
 
 export class ListCards implements UseCase<ListCardsInput, ListCardsOutput> {
@@ -30,7 +31,7 @@ export class ListCards implements UseCase<ListCardsInput, ListCardsOutput> {
     return {
       version: catalog.version.value,
       language: catalog.language,
-      cards: catalog.search(input).map((card) => card.data),
+      cards: catalog.search(input).map((card) => toCardView(catalog, card)),
     };
   }
 }

@@ -5,3 +5,4 @@ export * from './CardLayout.js';
 export * from './Catalog.js';
 export * from './CatalogVersion.js';
 export * from './References.js';
+export * from './traits/index.js';

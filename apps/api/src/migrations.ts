@@ -163,4 +163,48 @@ export const migrations: readonly SqlMigration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    name: 'add_card_traits',
+    sql: `
+      -- Caractéristiques dérivées des cartes, calculées une fois à l'import.
+      -- analysis_version : version des règles d'analyse ; NULL ou ancienne = à recalculer.
+      ALTER TABLE catalog ADD COLUMN analysis_version INTEGER;
+      -- Catégories et capacités particulières présentes (libellé, icône, description), en JSON.
+      ALTER TABLE catalog ADD COLUMN trait_definitions TEXT;
+
+      -- Une ligne par caractéristique : interrogeable directement (ex. cartes à Gel en 1.21).
+      CREATE TABLE card_trait (
+        version   TEXT NOT NULL,
+        language  TEXT NOT NULL,
+        card_id   TEXT NOT NULL,
+        kind      TEXT NOT NULL CHECK (kind IN ('strike', 'bonus', 'heal', 'ability', 'category')),
+        value     TEXT NOT NULL,
+        PRIMARY KEY (version, language, card_id, kind, value),
+        FOREIGN KEY (version, language, card_id) REFERENCES card (version, language, id) ON DELETE CASCADE
+      );
+      CREATE INDEX card_trait_by_value ON card_trait (version, language, kind, value);
+    `,
+  },
+  {
+    version: 3,
+    name: 'add_card_trait_flags',
+    sql: `
+      -- Indicateurs booléens (ex. multiélément) : kind = 'flag', value = nom de l'indicateur.
+      -- SQLite ne modifie pas une contrainte CHECK : la table est recréée. Ses lignes sont
+      -- dérivées des cartes, elles seront recalculées à la prochaine synchro.
+      DROP TABLE card_trait;
+      CREATE TABLE card_trait (
+        version   TEXT NOT NULL,
+        language  TEXT NOT NULL,
+        card_id   TEXT NOT NULL,
+        kind      TEXT NOT NULL CHECK (kind IN ('strike', 'bonus', 'heal', 'ability', 'category', 'flag')),
+        value     TEXT NOT NULL,
+        PRIMARY KEY (version, language, card_id, kind, value),
+        FOREIGN KEY (version, language, card_id) REFERENCES card (version, language, id) ON DELETE CASCADE
+      );
+      CREATE INDEX card_trait_by_value ON card_trait (version, language, kind, value);
+      UPDATE catalog SET analysis_version = NULL;
+    `,
+  },
 ];

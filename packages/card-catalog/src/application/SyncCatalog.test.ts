@@ -109,6 +109,20 @@ describe('SyncCatalog', () => {
     assert.deepEqual(result.assets.unavailableFrameVariants, [{ path: 'img/frame/body-water.webp', reason: 'HTTP 404' }]);
   });
 
+  it("recalcule les caractéristiques d'une version enregistrée avec d'anciennes règles", async () => {
+    await sync.execute({ language: 'fr' });
+    const reanalyzed: string[] = [];
+    repository.analysisVersion = async () => 0;
+    repository.saveTraits = async (catalog) => {
+      reanalyzed.push(catalog.version.value);
+    };
+
+    const result = await sync.execute({ language: 'fr' });
+
+    assert.equal(result.status, 'reanalyzed');
+    assert.deepEqual(reanalyzed, ['1.21']);
+  });
+
   it('conserve chaque version importée', async () => {
     await sync.execute({ language: 'fr', version: '1.20' });
     await sync.execute({ language: 'fr' });
@@ -140,6 +154,7 @@ describe('ListCards / GetCard', () => {
     await new SyncCatalog(new FakeSource(), repository, new FakeAssetStore()).execute({ language: 'fr' });
     const { cards } = await new ListCards(repository).execute({ language: 'fr', element: 'fire' });
     assert.deepEqual(cards.map((card) => card.name), ['Esprit Feu']);
+    assert.deepEqual(cards[0]?.traits.strikeElements, ['fire']);
   });
 });
 
@@ -156,6 +171,8 @@ describe('GetCatalogOverview / GetCardLayout', () => {
     assert.deepEqual(overview.availableVersions, ['1.21', '1.20']);
     assert.equal(overview.cardCount, 2);
     assert.deepEqual(overview.elements.map((element) => element.id), ['fire', 'water']);
+    assert.ok(overview.specialAbilities.some((special) => special.label === 'Chanceur'));
+    assert.ok(overview.traitCategories.some((category) => category.id === 'economy'));
     assert.equal((await new GetCatalogOverview(repository).execute({ language: 'fr', version: '1.20' })).version, '1.20');
     assert.equal((await new GetCardLayout(repository).execute())['width'], 961);
   });

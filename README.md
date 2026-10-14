@@ -58,6 +58,17 @@ Même séparation, côté front :
 
 Le front ne dépend pas des packages métier : il parle à l'API via ses propres types.
 
+### Composant carte (`ui/card/`)
+
+`<GameCard card={card} width={200} />` dessine une carte d'après le plan de rendu publié par le jeu,
+avec le crédit de l'artiste dessous. Il est autonome et réutilisable dans n'importe quel outil, sous :
+
+- `<CardEnvironmentProvider>` : plan de rendu, référentiels (éléments, raretés, mots-clés), URL des images ;
+- `<CardDetailProvider>` (facultatif) : un **clic droit** sur une carte (ou la touche Menu) ouvre sa vue
+  détail (talents, capacités, tox, résistances, lore). Le clic gauche reste libre pour les outils.
+
+Les deux sont posés une fois dans `App.tsx`. La carte ouverte est reflétée dans l'URL (`?card=<slug>`).
+
 ## Commandes
 
 ```sh
@@ -84,6 +95,11 @@ pnpm sync                    # dernière version publiée
 pnpm sync --version 1.20     # une version précise
 pnpm sync --all              # toutes les versions publiées
 ```
+
+**Caractéristiques des cartes** (éléments de frappe, de bonus et de soin, capacités particulières et leurs
+catégories) : calculées une fois à l'import par `analyzeTraits` (`packages/card-catalog/src/domain/traits/`) et
+enregistrées (table `card_trait`). Le classement des capacités est dans `TraitTaxonomy.ts` ; après toute
+modification des règles, incrémenter `ANALYSIS_VERSION` puis lancer `pnpm sync --all` pour recalculer.
 
 Chaque version est conservée. Relancer la synchro ne réimporte pas une version déjà en base
 et ne télécharge que les images manquantes. Les données sont dans `data/` (base `spamtools.sqlite`

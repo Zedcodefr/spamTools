@@ -41,6 +41,8 @@ describe('API catalogue', () => {
     assert.equal(body.version, '1.10');
     assert.deepEqual(body.availableVersions, ['1.10', '1.9']);
     assert.deepEqual(body.elements.map((element: { id: string }) => element.id), ['fire', 'water']);
+    assert.ok(body.specialAbilities.length > 0);
+    assert.ok(body.traitCategories.length > 0);
   });
 
   it('GET /api/cards liste et filtre les cartes', async () => {
@@ -57,6 +59,7 @@ describe('API catalogue', () => {
     const found = await get(`/api/cards/${FIRE_SPIRIT}`);
     assert.equal(found.statusCode, 200);
     assert.equal(found.json().card.artwork.artist.name, 'Atto');
+    assert.deepEqual(found.json().card.traits.strikeElements, ['fire']);
     assert.equal((await get('/api/cards/inconnue')).statusCode, 404);
   });
 

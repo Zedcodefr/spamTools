@@ -52,7 +52,11 @@ async function main(): Promise<number> {
 }
 
 function report(result: SyncCatalogOutput): void {
-  const status = result.status === 'imported' ? 'importée' : 'déjà présente';
+  const status = {
+    imported: 'importée',
+    unchanged: 'déjà présente',
+    reanalyzed: 'déjà présente, caractéristiques recalculées',
+  }[result.status];
   const { downloaded, alreadyPresent, failures, unavailableFrameVariants } = result.assets;
   console.log(`Version ${result.version} (${result.language}) : ${status}, ${result.cardCount} cartes`);
   console.log(`  Images : ${downloaded} téléchargées, ${alreadyPresent} déjà présentes, ${failures.length} en échec`);

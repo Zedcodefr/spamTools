@@ -8,9 +8,11 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p . && tsc -p tsconfig.test.json",
+    "test": "node --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "lucide-react": "1.48.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

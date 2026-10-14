@@ -1,5 +1,6 @@
 import type { UseCase } from '@spamtools/shared-kernel';
-import { CatalogVersion, type CardData } from '../domain/index.js';
+import { CatalogVersion } from '../domain/index.js';
+import { toCardView, type CardView } from './CardView.js';
 import { NotFoundError } from './errors.js';
 import type { CatalogRepository } from './ports/index.js';
 
@@ -13,7 +14,7 @@ export interface GetCardInput {
 export interface GetCardOutput {
   readonly version: string;
   readonly language: string;
-  readonly card: CardData;
+  readonly card: CardView;
 }
 
 export class GetCard implements UseCase<GetCardInput, GetCardOutput> {
@@ -26,6 +27,6 @@ export class GetCard implements UseCase<GetCardInput, GetCardOutput> {
     if (catalog === undefined || card === undefined) {
       throw new NotFoundError(`Carte introuvable : ${input.id}`);
     }
-    return { version: catalog.version.value, language: catalog.language, card: card.data };
+    return { version: catalog.version.value, language: catalog.language, card: toCardView(catalog, card) };
   }
 }

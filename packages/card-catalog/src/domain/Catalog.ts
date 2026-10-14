@@ -3,6 +3,9 @@ import { AssetPath } from './AssetPath.js';
 import type { Card, CardCriteria } from './Card.js';
 import type { CatalogVersion } from './CatalogVersion.js';
 import type { CardElement, Keyword, Rarity } from './References.js';
+import type { CardTraits, CatalogTraits } from './traits/CardTraits.js';
+import { analyzeTraits } from './traits/analyzeTraits.js';
+import { ANALYSIS_VERSION } from './traits/TraitTaxonomy.js';
 
 export class CatalogId extends Identifier {
   static of(version: CatalogVersion, language: string): CatalogId {
@@ -18,6 +21,15 @@ export interface CatalogProps {
   readonly rarities: readonly Rarity[];
   readonly keywords: readonly Keyword[];
   readonly cards: readonly Card[];
+  /**
+   * Caractéristiques déjà calculées (relecture depuis la base). Absentes ou calculées avec
+   * d'anciennes règles, elles sont recalculées : c'est le cas à l'import.
+   */
+  readonly traits?: CatalogTraits | undefined;
+}
+
+interface ValidCatalogProps extends CatalogProps {
+  readonly traits: CatalogTraits;
 }
 
 /**
@@ -25,7 +37,7 @@ export interface CatalogProps {
  * avec les référentiels (éléments, raretés, mots-clés) auxquels elles renvoient.
  */
 export class Catalog extends AggregateRoot<CatalogId> {
-  private constructor(private readonly props: CatalogProps) {
+  private constructor(private readonly props: ValidCatalogProps) {
     super(CatalogId.of(props.version, props.language));
   }
 
@@ -47,7 +59,15 @@ export class Catalog extends AggregateRoot<CatalogId> {
     }
 
     const cards = [...props.cards].sort((a, b) => a.number - b.number);
-    return new Catalog({ ...props, cards });
+    const upToDate = props.traits !== undefined && props.traits.analysisVersion === ANALYSIS_VERSION;
+    const traits = upToDate
+      ? (props.traits as CatalogTraits)
+      : analyzeTraits({ cards: cards.map((card) => card.data), keywords: props.keywords });
+    const missing = cards.find((card) => traits.byCard[card.id.value] === undefined);
+    if (missing !== undefined) {
+      throw new DomainError(`Caractéristiques manquantes pour la carte "${missing.name}"`);
+    }
+    return new Catalog({ ...props, cards, traits });
   }
 
   get version(): CatalogVersion {
@@ -77,6 +97,15 @@ export class Catalog extends AggregateRoot<CatalogId> {
   /** Cartes triées par numéro. */
   get cards(): readonly Card[] {
     return this.props.cards;
+  }
+
+  /** Caractéristiques dérivées (éléments de frappe, capacités particulières...). */
+  get traits(): CatalogTraits {
+    return this.props.traits;
+  }
+
+  traitsOf(card: Card): CardTraits {
+    return this.props.traits.byCard[card.id.value] as CardTraits;
   }
 
   findCard(id: string): Card | undefined {

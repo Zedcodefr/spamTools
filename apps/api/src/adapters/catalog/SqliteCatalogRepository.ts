@@ -4,9 +4,12 @@ import {
   CardLayout,
   Catalog,
   CatalogVersion,
+  ANALYSIS_VERSION,
   type CardAction,
   type CardData,
+  type CardTraits,
   type CatalogRepository,
+  type CatalogTraits,
 } from '@spamtools/card-catalog';
 import type { SqliteDatabase } from '@spamtools/database/infrastructure';
 
@@ -78,7 +81,24 @@ export class SqliteCatalogRepository implements CatalogRepository {
       for (const card of catalog.cards) {
         insertCard(db, scope, card.data);
       }
+      writeTraits(db, catalog);
     });
+  }
+
+  async analysisVersion(version: CatalogVersion, language: string): Promise<number | undefined> {
+    const row = this.database.connection
+      .prepare('SELECT analysis_version FROM catalog WHERE version = ? AND language = ?')
+      .get(version.value, language);
+    const value = row?.['analysis_version'];
+    return typeof value === 'number' ? value : undefined;
+  }
+
+  async saveTraits(catalog: Catalog): Promise<void> {
+    this.database.transaction((db) => {
+      db.prepare('DELETE FROM card_trait WHERE version = ? AND language = ?').run(catalog.version.value, catalog.language);
+      writeTraits(db, catalog);
+    });
+    this.cache.delete(`${catalog.version.value}/${catalog.language}`);
   }
 
   async listVersions(language: string): Promise<CatalogVersion[]> {
@@ -127,11 +147,14 @@ export class SqliteCatalogRepository implements CatalogRepository {
     const select = (table: string, orderBy: string): Row[] =>
       db.prepare(`SELECT * FROM ${table} WHERE version = ? AND language = ? ORDER BY ${orderBy}`).all(...scope);
 
-    const catalogRow = db.prepare('SELECT generated_at FROM catalog WHERE version = ? AND language = ?').get(...scope);
+    const catalogRow = db
+      .prepare('SELECT generated_at, analysis_version, trait_definitions FROM catalog WHERE version = ? AND language = ?')
+      .get(...scope);
     if (catalogRow === undefined) {
       return undefined;
     }
 
+    const cardRows = select('card', 'number');
     const resistances = groupByCard(select('card_resistance', 'card_id, element'));
     const abilities = groupByCard(select('card_ability', 'card_id, position'));
     const skills = groupByCard(select('card_skill', 'card_id, position'));
@@ -141,6 +164,11 @@ export class SqliteCatalogRepository implements CatalogRepository {
       version,
       language,
       generatedAt: new Date(text(catalogRow, 'generated_at')),
+      traits: readTraits(
+        catalogRow,
+        cardRows.map((row) => text(row, 'id')),
+        select('card_trait', 'card_id, kind, value'),
+      ),
       elements: select('element', 'sort_order').map((row) => ({
         id: text(row, 'id'),
         name: text(row, 'name'),
@@ -164,7 +192,7 @@ export class SqliteCatalogRepository implements CatalogRepository {
         color: nullableText(row, 'color'),
         icon: nullableText(row, 'icon'),
       })),
-      cards: select('card', 'number').map((row) => {
+      cards: cardRows.map((row) => {
         const id = text(row, 'id');
         return Card.create({
           id,
@@ -229,6 +257,81 @@ export class SqliteCatalogRepository implements CatalogRepository {
       }),
     });
   }
+}
+
+/** Listes de caractéristiques : une ligne `card_trait` par valeur. */
+const TRAIT_KINDS = {
+  strike: 'strikeElements',
+  bonus: 'bonusElements',
+  heal: 'healElements',
+  ability: 'specialAbilities',
+  category: 'categories',
+} as const satisfies Record<string, keyof CardTraits>;
+
+/** Indicateurs booléens : une ligne `card_trait` (kind 'flag') quand ils sont vrais. */
+const TRAIT_FLAGS = ['multiElement'] as const satisfies readonly (keyof CardTraits)[];
+
+function writeTraits(db: DatabaseSync, catalog: Catalog): void {
+  const { traits } = catalog;
+  db.prepare('UPDATE catalog SET analysis_version = ?, trait_definitions = ? WHERE version = ? AND language = ?').run(
+    traits.analysisVersion,
+    JSON.stringify({ categories: traits.categories, specialAbilities: traits.specialAbilities }),
+    catalog.version.value,
+    catalog.language,
+  );
+  for (const [cardId, cardTraits] of Object.entries(traits.byCard)) {
+    const scope = { version: catalog.version.value, language: catalog.language, card_id: cardId };
+    for (const [kind, field] of Object.entries(TRAIT_KINDS)) {
+      for (const value of cardTraits[field]) {
+        insert(db, 'card_trait', { ...scope, kind, value });
+      }
+    }
+    for (const flag of TRAIT_FLAGS.filter((name) => cardTraits[name])) {
+      insert(db, 'card_trait', { ...scope, kind: 'flag', value: flag });
+    }
+  }
+}
+
+/**
+ * Caractéristiques enregistrées, si elles ont été calculées avec les règles actuelles ;
+ * sinon `undefined` : le catalogue les recalcule (en attendant la prochaine synchro).
+ */
+function readTraits(catalogRow: Row, cardIds: readonly string[], rows: Row[]): CatalogTraits | undefined {
+  if (catalogRow['analysis_version'] !== ANALYSIS_VERSION || catalogRow['trait_definitions'] === null) {
+    return undefined;
+  }
+  type MutableTraits = { -readonly [K in keyof CardTraits]: CardTraits[K] extends readonly string[] ? string[] : boolean };
+  // Toutes les cartes, y compris celles sans aucune caractéristique (aucune ligne).
+  const byCard: Record<string, MutableTraits> = Object.fromEntries(
+    cardIds.map((id) => [
+      id,
+      {
+        strikeElements: [],
+        bonusElements: [],
+        healElements: [],
+        multiElement: false,
+        specialAbilities: [],
+        categories: [],
+      },
+    ]),
+  );
+  for (const row of rows) {
+    const traits = byCard[text(row, 'card_id')];
+    const kind = text(row, 'kind');
+    if (traits === undefined) {
+      continue;
+    }
+    if (kind === 'flag') {
+      const flag = TRAIT_FLAGS.find((name) => name === text(row, 'value'));
+      if (flag !== undefined) {
+        traits[flag] = true;
+      }
+    } else {
+      traits[TRAIT_KINDS[kind as keyof typeof TRAIT_KINDS]].push(text(row, 'value'));
+    }
+  }
+  const definitions = json<Pick<CatalogTraits, 'categories' | 'specialAbilities'>>(catalogRow, 'trait_definitions');
+  return { analysisVersion: ANALYSIS_VERSION, ...definitions, byCard };
 }
 
 function insertCard(db: DatabaseSync, scope: { version: string; language: string }, card: CardData): void {

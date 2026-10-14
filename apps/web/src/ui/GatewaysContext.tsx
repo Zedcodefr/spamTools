@@ -1,11 +1,13 @@
 import { createContext, use, type ReactNode } from 'react';
+import type { CatalogGateway } from '../application/ports/CatalogGateway.ts';
 
 /**
  * Injection de dépendances "à la React" : les composants récupèrent
  * les ports via ce Context, sans connaître leur implémentation.
  */
-// Les ports d'accès aux cartes seront ajoutés avec la page SpamDex.
-export interface Gateways {}
+export interface Gateways {
+  readonly catalog: CatalogGateway;
+}
 
 const GatewaysContext = createContext<Gateways | null>(null);
 
