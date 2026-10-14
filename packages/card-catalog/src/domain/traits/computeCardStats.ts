@@ -10,8 +10,21 @@ import type {
   UnquantifiedEffect,
 } from './CardStats.js';
 
-/** Nombre de cartes adverses touchées par une attaque de zone. */
+/** Nombre de cartes adverses, touchées toutes par une attaque de zone. */
 export const ENEMY_CARDS = 4;
+/** Nombre de cartes sur le terrain (les deux camps). */
+export const FIELD_CARDS = 8;
+
+/**
+ * Ciblage d'une capacité de dégâts : dégâts totaux (× targets) et reçus par une carte adverse
+ * donnée (× singleTarget). Une cible au hasard touche une carte donnée avec la probabilité 1 / nombre de candidates.
+ */
+const TARGETING = {
+  single: { targets: 1, singleTarget: 1 },
+  zone: { targets: ENEMY_CARDS, singleTarget: 1 },
+  randomEnemy: { targets: 1, singleTarget: 1 / ENEMY_CARDS },
+  randomField: { targets: ENEMY_CARDS / FIELD_CARDS, singleTarget: 1 / FIELD_CARDS },
+} as const;
 
 const BONUS_EFFECT = /^AddAllPlayerAttack/;
 /** Bonus dont la valeur de base augmente à chaque utilisation (« La valeur de base du bonus augmente de 1 »). */
@@ -51,6 +64,9 @@ const COST = /\[cout ([^\]]+)\]/;
 const RANDOM_ELEMENT = /element aleatoire|elements? au hasard/;
 const EVERY_ELEMENT = /chaque element|tous les elements/;
 const ON_CRIT = /en cas de (coup )?critique/;
+const ZONE = /cible toutes les cartes adverses/;
+const RANDOM_ENEMY = /cible aleatoirement (les cartes adverses|une carte adverse)|ennemis aleatoires/;
+const RANDOM_FIELD = /cible aleatoirement les cartes du terrain/;
 const ENEMY = /advers/;
 const ALL_ALLIES = /toutes les cartes alliees|toutes vos cartes|toutes les cartes du terrain|toutes les cartes du lanceur/;
 const RANDOM_ALLY = /aleatoirement sur une carte alliee|une carte alliee (au hasard|aleatoire)/;
@@ -135,16 +151,16 @@ function abilityModel(
       continue;
     }
     const value = (action.min + action.max) / 2;
-    const line = (targets = 1): EffectLine | undefined => {
+    const line = (targeting: keyof typeof TARGETING = 'single'): EffectLine | undefined => {
       const elements = elementShares(action, card, text, context);
-      return Object.keys(elements).length === 0 ? undefined : { value, elements, targets, weight };
+      return Object.keys(elements).length === 0 ? undefined : { value, elements, weight, ...TARGETING[targeting] };
     };
 
     if (action.kind === 'damage') {
       if (action.effect === VARIABLE_DAMAGE) {
         notes.note(ability.name, 'part des dégâts selon les PV manquants : seule la base est comptée');
       }
-      const damageLine = line(action.effect === 'DamageAll' ? ENEMY_CARDS : 1);
+      const damageLine = line(damageTargeting(action, text));
       if (damageLine === undefined) {
         notes.note(ability.name, 'élément des dégâts indéterminé');
       } else {
@@ -202,6 +218,16 @@ function abilityModel(
     growth,
     boosts,
   };
+}
+
+function damageTargeting(action: CardAction, text: string): keyof typeof TARGETING {
+  if (action.effect === 'DamageAll' || ZONE.test(text)) {
+    return 'zone';
+  }
+  if (RANDOM_ENEMY.test(text)) {
+    return 'randomEnemy';
+  }
+  return RANDOM_FIELD.test(text) ? 'randomField' : 'single';
 }
 
 /** Renforts de précision, critique ou dégâts de base portés par une action (aucun s'il vise l'adversaire). */

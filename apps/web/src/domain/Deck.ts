@@ -79,6 +79,8 @@ export interface TurnProjection {
   readonly damage: ElementAmounts;
   readonly heal: ElementAmounts;
   readonly totalDamage: number;
+  /** Dégâts reçus en moyenne par une carte adverse donnée. */
+  readonly totalSingleTargetDamage: number;
   readonly totalHeal: number;
 }
 
@@ -97,9 +99,12 @@ export interface DeckAnalysis {
   readonly dpsCardId: string | null;
   readonly averageResistances: ElementAmounts;
   readonly weaknesses: readonly string[];
-  /** Moyennes par tour sur la simulation, tout compris. */
+  /** Moyennes par tour sur la simulation, tout compris : dégâts totaux, toutes cibles confondues… */
   readonly damagePerTurn: ElementAmounts;
   readonly totalDamagePerTurn: number;
+  /** … et dégâts reçus par une carte adverse donnée (zone : une part ; cible au hasard : sa probabilité). */
+  readonly singleTargetDamagePerTurn: ElementAmounts;
+  readonly totalSingleTargetDamagePerTurn: number;
   readonly healPerTurn: ElementAmounts;
   readonly totalHealPerTurn: number;
   readonly generatedPerTurn: ElementAmounts;
@@ -113,6 +118,7 @@ export interface DeckAnalysis {
     readonly isDps: boolean;
     readonly resistances: ElementAmounts;
     readonly damagePerTurn: number;
+    readonly singleTargetDamagePerTurn: number;
     readonly healPerTurn: number;
     readonly generatedPerTurn: number;
     readonly finalBoosts: CardBoosts;

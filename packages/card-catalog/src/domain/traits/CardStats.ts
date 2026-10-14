@@ -19,8 +19,16 @@ export interface EffectLine {
   readonly value: number;
   /** Part de chaque élément : 1 pour un élément fixe, 1/6 chacun pour un élément aléatoire. */
   readonly elements: ElementAmounts;
-  /** Nombre de cibles touchées (attaque de zone : 4). */
+  /**
+   * Nombre moyen de cartes adverses touchées par la ligne : dégâts totaux = valeur × targets
+   * (une cible : 1 ; zone : 4 ; cible au hasard sur tout le terrain : 1/2).
+   */
   readonly targets: number;
+  /**
+   * Part de la valeur reçue en moyenne par une carte adverse donnée (« cible unique ») :
+   * une cible ou zone : 1 ; cible au hasard parmi les 4 adverses : 1/4 ; parmi les 8 du terrain : 1/8.
+   */
+  readonly singleTarget: number;
   /** Poids de la ligne : 1, ou 1 / nombre d'options pour une capacité à « Choix ». */
   readonly weight: number;
 }

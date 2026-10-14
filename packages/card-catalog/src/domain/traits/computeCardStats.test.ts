@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Ability, CardAction, CardData, Talent } from '../Card.js';
-import { computeCardStats, ENEMY_CARDS, type StatsContext } from './computeCardStats.js';
+import { computeCardStats, ENEMY_CARDS, FIELD_CARDS, type StatsContext } from './computeCardStats.js';
 
 const BASE = ['fire', 'water', 'earth', 'nature', 'shadow', 'light'];
 
@@ -60,11 +60,24 @@ describe('computeCardStats', () => {
       // Écho 50 % : disponible au tour suivant une fois sur deux -> période moyenne 0,5 × 1 + 0,5 × 3 = 2.
       ability([action('DamageAll', 'damage', 'shadow', 10)], { cooldown: 3, cooldownResetChance: 50 }),
     ]);
-    assert.deepEqual(first?.damage, [{ value: 15, elements: { fire: 1 }, targets: 1, weight: 1 }]);
-    assert.deepEqual(first?.bonus, [{ value: 2, elements: { water: 1 }, targets: 1, weight: 1 }]);
+    assert.deepEqual(first?.damage, [{ value: 15, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1 }]);
+    assert.deepEqual(first?.bonus, [{ value: 2, elements: { water: 1 }, targets: 1, singleTarget: 1, weight: 1 }]);
     assert.deepEqual([first?.period, first?.precision, first?.critChance, first?.critMultiplier], [1, 50, 25, 3]);
     assert.equal(second?.period, 2);
     assert.equal(second?.damage[0]?.targets, ENEMY_CARDS);
+  });
+
+  it('distingue dégâts totaux et cible unique selon le ciblage', () => {
+    const targeting = (effect: string, effectCode = 'damage') =>
+      model([ability([action(effectCode, 'damage', 'fire', 10)], { effect })])[0]?.damage.map((line) => [line.targets, line.singleTarget]);
+    assert.deepEqual(targeting('Attaque 10 Feu'), [[1, 1]]);
+    assert.deepEqual(targeting('Cible toutes les cartes adverses / Attaque 10 Feu'), [[ENEMY_CARDS, 1]]);
+    assert.deepEqual(targeting('Attaque 5 Feu', 'DamageAll'), [[ENEMY_CARDS, 1]]);
+    assert.deepEqual(targeting('Cible aléatoirement les cartes adverses / Attaque 3 Feu X18'), [[1, 1 / ENEMY_CARDS]]);
+    assert.deepEqual(targeting('Attaque 25 Eau / Attaque 25 Eau / Ennemis aléatoires'), [[1, 1 / ENEMY_CARDS]]);
+    assert.deepEqual(targeting('Cible aléatoirement les cartes du terrain / Attaque 30 Nature'), [
+      [ENEMY_CARDS / FIELD_CARDS, 1 / FIELD_CARDS],
+    ]);
   });
 
   it("pondère les options d'un Choix et répartit un élément aléatoire", () => {

@@ -21,7 +21,10 @@ export type ElementAmounts = Readonly<Record<string, number>>;
 export interface EffectLine {
   readonly value: number;
   readonly elements: ElementAmounts;
+  /** Dégâts totaux = valeur × targets (zone : 4). */
   readonly targets: number;
+  /** Part reçue par une carte adverse donnée (zone : 1 ; cible au hasard parmi 4 : 1/4). */
+  readonly singleTarget: number;
   readonly weight: number;
 }
 
@@ -90,9 +93,12 @@ export interface TurnProjection {
   readonly turn: number;
   /** Stock de bonus élémentaires pendant ce tour (générés ce tour compris). */
   readonly bonusStock: ElementAmounts;
+  /** Dégâts totaux, toutes cibles confondues. */
   readonly damage: ElementAmounts;
   readonly heal: ElementAmounts;
   readonly totalDamage: number;
+  /** Dégâts reçus en moyenne par une carte adverse donnée. */
+  readonly totalSingleTargetDamage: number;
   readonly totalHeal: number;
 }
 
@@ -102,8 +108,9 @@ export interface DeckCardSummary {
   readonly talentName: string;
   readonly isDps: boolean;
   readonly resistances: ElementAmounts;
-  /** Moyennes par tour sur la simulation. */
+  /** Moyennes par tour sur la simulation : dégâts totaux, et reçus par une carte adverse donnée. */
   readonly damagePerTurn: number;
+  readonly singleTargetDamagePerTurn: number;
   readonly healPerTurn: number;
   readonly generatedPerTurn: number;
   /** Renforts cumulés au dernier tour simulé. */
@@ -117,9 +124,12 @@ export interface DeckAnalysis {
   readonly averageResistances: ElementAmounts;
   /** Éléments où la résistance moyenne est la plus basse. */
   readonly weaknesses: readonly string[];
-  /** Moyennes par tour sur la simulation, tout compris. */
+  /** Moyennes par tour sur la simulation, tout compris : dégâts totaux, toutes cibles confondues… */
   readonly damagePerTurn: ElementAmounts;
   readonly totalDamagePerTurn: number;
+  /** … et dégâts reçus par une carte adverse donnée (zone : une part ; cible au hasard : sa probabilité). */
+  readonly singleTargetDamagePerTurn: ElementAmounts;
+  readonly totalSingleTargetDamagePerTurn: number;
   readonly healPerTurn: ElementAmounts;
   readonly totalHealPerTurn: number;
   readonly generatedPerTurn: ElementAmounts;
@@ -157,7 +167,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
   const abilities = cards.map((card) => [...card.base.abilities, ...card.talent.abilities]);
   const boosts: CardBoosts[] = cards.map(() => ({ ...NO_BOOSTS }));
   const uses = abilities.map((list) => list.map(() => 0));
-  const perCard = cards.map(() => ({ damage: 0, heal: 0, generated: 0 }));
+  const perCard = cards.map(() => ({ damage: 0, singleTargetDamage: 0, heal: 0, generated: 0 }));
   const unappliedTargeted = new Set<string>();
 
   const applyBoost = (from: number, boost: Boost, rate: number, source: string) => {
@@ -186,8 +196,9 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
 
   let stock: Record<string, number> = sum(cards.flatMap((card) => [card.base.startingBonus, card.talent.startingBonus]));
   const startingBonus = round(stock);
-  const totals: Record<'damage' | 'heal' | 'generated' | 'consumed', Record<string, number>> = {
+  const totals: Record<'damage' | 'singleTargetDamage' | 'heal' | 'generated' | 'consumed', Record<string, number>> = {
     damage: {},
+    singleTargetDamage: {},
     heal: {},
     generated: {},
     consumed: {},
@@ -228,6 +239,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
 
     // 3. Dégâts et soins.
     const damage: Record<string, number> = {};
+    const singleTargetDamage: Record<string, number> = {};
     const heal: Record<string, number> = {};
     cards.forEach((card, index) => {
       const cardBoosts = boosts[index] as CardBoosts;
@@ -235,25 +247,34 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
       abilities[index]?.forEach((ability, abilityIndex) => {
         const used = uses[index]?.[abilityIndex] ?? 0;
         const factor = successFactor(ability, cardBoosts) / ability.period;
-        const effect = (lines: readonly EffectLine[], base: number, into: Record<string, number>) => {
+        const effect = (
+          lines: readonly EffectLine[],
+          base: number,
+          into: Record<string, number>,
+          reach: (line: EffectLine) => number,
+        ) => {
           let total = 0;
           for (const line of lines) {
             for (const [element, share] of Object.entries(line.elements)) {
-              const value = (line.value + base) * line.targets * line.weight * share * factor * boostOf(element);
+              const value = (line.value + base) * reach(line) * line.weight * share * factor * boostOf(element);
               into[element] = (into[element] ?? 0) + value;
               total += value;
             }
           }
           return total;
         };
-        perCard[index]!.damage += effect(ability.damage, ability.growth.damage * used + cardBoosts.baseDamage, damage);
-        perCard[index]!.heal += effect(ability.heal, ability.growth.heal * used + cardBoosts.baseHeal, heal);
+        const damageBase = ability.growth.damage * used + cardBoosts.baseDamage;
+        const cardTotals = perCard[index]!;
+        cardTotals.damage += effect(ability.damage, damageBase, damage, (line) => line.targets);
+        cardTotals.singleTargetDamage += effect(ability.damage, damageBase, singleTargetDamage, (line) => line.singleTarget);
+        cardTotals.heal += effect(ability.heal, ability.growth.heal * used + cardBoosts.baseHeal, heal, (line) => line.targets);
         // Croissance « après utilisation » : comptée à partir de l'utilisation suivante.
         uses[index]![abilityIndex] = used + 1 / ability.period;
       });
     });
 
     addInto(totals.damage, damage);
+    addInto(totals.singleTargetDamage, singleTargetDamage);
     addInto(totals.heal, heal);
     addInto(totals.generated, generated);
     addInto(totals.consumed, consumed);
@@ -263,12 +284,14 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
       damage: round(damage),
       heal: round(heal),
       totalDamage: roundValue(totalOf(damage)),
+      totalSingleTargetDamage: roundValue(totalOf(singleTargetDamage)),
       totalHeal: roundValue(totalOf(heal)),
     });
   }
 
   const average = (amounts: ElementAmounts) => round(scale(amounts, 1 / turnCount));
   const damagePerTurn = average(totals.damage);
+  const singleTargetDamagePerTurn = average(totals.singleTargetDamage);
   const healPerTurn = average(totals.heal);
 
   return {
@@ -279,6 +302,8 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
       cards.length === 0 ? [] : Object.keys(averageResistances).filter((element) => averageResistances[element] === lowest),
     damagePerTurn,
     totalDamagePerTurn: roundValue(totalOf(damagePerTurn)),
+    singleTargetDamagePerTurn,
+    totalSingleTargetDamagePerTurn: roundValue(totalOf(singleTargetDamagePerTurn)),
     healPerTurn,
     totalHealPerTurn: roundValue(totalOf(healPerTurn)),
     generatedPerTurn: average(totals.generated),
@@ -292,6 +317,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
       isDps: index === dpsIndex,
       resistances: round(cardResistances[index] ?? {}),
       damagePerTurn: roundValue((perCard[index]?.damage ?? 0) / turnCount),
+      singleTargetDamagePerTurn: roundValue((perCard[index]?.singleTargetDamage ?? 0) / turnCount),
       healPerTurn: roundValue((perCard[index]?.heal ?? 0) / turnCount),
       generatedPerTurn: roundValue((perCard[index]?.generated ?? 0) / turnCount),
       finalBoosts: roundBoosts(boosts[index] ?? NO_BOOSTS),

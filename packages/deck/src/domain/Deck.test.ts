@@ -42,7 +42,9 @@ const empty: StatContribution = {
   boostsPerTurn: [], unquantified: [],
 };
 
-const line = (value: number, element = 'fire', targets = 1) => ({ value, elements: { [element]: 1 }, targets, weight: 1 });
+const line = (value: number, element = 'fire', targets = 1, singleTarget = 1) => ({
+  value, elements: { [element]: 1 }, targets, singleTarget, weight: 1,
+});
 
 const ability = (overrides: Partial<AbilityModel>): AbilityModel => ({
   name: 'Capacité', period: 1, precision: 100, critChance: 0, critMultiplier: 2, damage: [], heal: [], bonus: [], cost: {},
@@ -83,6 +85,26 @@ describe('analyzeDeck : simulation', () => {
     const analysis = analyzeDeck(cards, { turns: 2 });
     assert.deepEqual(analysis.damagePerTurn, { fire: 10, water: 10 });
     assert.equal(analysis.totalDamagePerTurn, 20);
+  });
+
+  it('distingue dégâts totaux et cible unique : zone, cibles au hasard', () => {
+    const cards = [
+      // Zone : 10 sur chacune des 4 cartes adverses.
+      cardStats('zone', { abilities: [ability({ damage: [line(10, 'fire', 4, 1)] })] }),
+      // 2 coups de 8 au hasard parmi 4 adverses : une carte donnée reçoit chaque coup avec 1 chance sur 4.
+      cardStats('random', { abilities: [ability({ damage: [line(8, 'water', 1, 0.25), line(8, 'water', 1, 0.25)] })] }),
+    ];
+    const analysis = analyzeDeck(cards, { turns: 1 });
+    assert.deepEqual(analysis.damagePerTurn, { fire: 40, water: 16 });
+    assert.deepEqual(analysis.singleTargetDamagePerTurn, { fire: 10, water: 4 });
+    assert.equal(analysis.turns[0]?.totalSingleTargetDamage, 14);
+    assert.deepEqual(
+      analysis.cards.map((card) => [card.damagePerTurn, card.singleTargetDamagePerTurn]),
+      [
+        [40, 10],
+        [16, 4],
+      ],
+    );
   });
 
   it('compte un bonus généré dès le tour où il est généré : +10 % par point', () => {

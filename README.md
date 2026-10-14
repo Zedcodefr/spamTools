@@ -116,7 +116,10 @@ les 4 cartes agissant à chaque tour :
 
 - capacité de recharge N : utilisée une fois tous les N tours (Écho : chance de rester disponible) ;
 - dégâts, soins et bonus élémentaires : × précision × (1 + chance de critique × (multiplicateur − 1)) ;
-  attaque de zone × 4 cibles ; « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
+  « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
+- dégâts **totaux** (toutes cibles) et **cible unique** (reçus par une carte adverse donnée) : zone = 4 cibles,
+  1 part par carte ; coup au hasard parmi les 4 adverses = 1 chance sur 4 de toucher une carte donnée
+  (parmi les 8 cartes du terrain : 1 sur 8, et la moitié des coups touche l'adversaire) ;
 - bonus élémentaires : le stock de chaque élément gagne les générés (dès le tour où ils le sont) et perd les
   consommés (coûts) ; chaque point ajoute +10 % aux dégâts et soins de cet élément (×2 avec Multiplicateur) ;
 - croissances : « la valeur de base augmente de N » (dégâts, soins ou bonus de la capacité, à chaque utilisation) ;

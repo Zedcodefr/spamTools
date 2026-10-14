@@ -59,8 +59,9 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
     <section className="deck-analysis" aria-label="Analyse du deck">
       <h3>Analyse</h3>
       <p className="deck-analysis__summary">
-        <strong>{number.format(analysis.totalDamagePerTurn)}</strong> dégâts par tour en moyenne sur{' '}
-        {analysis.turns.length} tours
+        <strong>{number.format(analysis.totalDamagePerTurn)}</strong> dégâts totaux par tour en moyenne sur{' '}
+        {analysis.turns.length} tours, dont <strong>{number.format(analysis.totalSingleTargetDamagePerTurn)}</strong> sur
+        une même carte adverse
         {first && last && (
           <>
             {' '}
@@ -84,8 +85,14 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
               <th scope="col" title="Résistance moyenne des cartes (%), talents et bonus d'équipe compris">
                 Rés.
               </th>
-              <th scope="col" title={`Dégâts par tour en moyenne sur ${analysis.turns.length} tours, tout compris`}>
+              <th scope="col" title={`Dégâts totaux par tour (toutes cibles), en moyenne sur ${analysis.turns.length} tours`}>
                 Dégâts
+              </th>
+              <th
+                scope="col"
+                title="Dégâts reçus par une carte adverse donnée : une part d'une attaque de zone, et chaque coup au hasard selon sa probabilité de la toucher"
+              >
+                Cible unique
               </th>
               <th scope="col" title={`Soins par tour en moyenne sur ${analysis.turns.length} tours, tout compris`}>
                 Soins
@@ -115,6 +122,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
                     {analysis.averageResistances[id] !== undefined && ' %'}
                   </td>
                   <td>{cell(analysis.damagePerTurn, id)}</td>
+                  <td>{cell(analysis.singleTargetDamagePerTurn, id)}</td>
                   <td>{cell(analysis.healPerTurn, id)}</td>
                   <td>{cell(analysis.generatedPerTurn, id)}</td>
                   <td>{cell(analysis.consumedPerTurn, id)}</td>
@@ -145,6 +153,12 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
               </span>
               <span>
                 {number.format(card.damagePerTurn)} dégâts
+                {card.singleTargetDamagePerTurn !== card.damagePerTurn && (
+                  <span className="deck-analysis__muted" title="Dégâts reçus par une carte adverse donnée">
+                    {' '}
+                    ({number.format(card.singleTargetDamagePerTurn)} cible unique)
+                  </span>
+                )}
                 {card.healPerTurn > 0 && <> · {number.format(card.healPerTurn)} soins</>} ·{' '}
                 {number.format(card.generatedPerTurn)} éléments / tour
               </span>
@@ -178,6 +192,9 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
             <tr>
               <th scope="col">Tour</th>
               <th scope="col">Dégâts</th>
+              <th scope="col" title="Dégâts reçus par une carte adverse donnée">
+                Cible unique
+              </th>
               <th scope="col">Soins</th>
               <th scope="col">Stock de bonus</th>
             </tr>
@@ -187,6 +204,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
               <tr key={turn.turn}>
                 <th scope="row">{turn.turn}</th>
                 <td>{number.format(turn.totalDamage)}</td>
+                <td>{number.format(turn.totalSingleTargetDamage)}</td>
                 <td>{turn.totalHeal > 0 ? number.format(turn.totalHeal) : '–'}</td>
                 <td className="deck-analysis__stock">
                   {elementIds
