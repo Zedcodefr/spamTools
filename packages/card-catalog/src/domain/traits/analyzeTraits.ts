@@ -168,9 +168,13 @@ function analyzeCard(card: CardData, keywords: readonly Keyword[], vocabulary: V
     abilityActions.filter((action) => action.kind === 'heal'),
     card,
   );
+  // Un bonus « dans un élément aléatoire » ne compte pour aucun élément (il relève du multiélément),
+  // même quand les données lui donnent l'élément de la carte.
   const bonusElements = new Set(
     abilityActions.flatMap((action) =>
-      BONUS_EFFECT.test(action.effect) && action.element !== null ? [action.element] : [],
+      BONUS_EFFECT.test(action.effect) && action.element !== null && !RANDOM_ELEMENT_ACTION.test(action.effect)
+        ? [action.element]
+        : [],
     ),
   );
   // Passifs naturels (tox de la carte ou donné par un talent) : Cœurs dans leur élément,

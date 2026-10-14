@@ -343,19 +343,26 @@ function weightedActions(ability: Ability): { action: CardAction; weight: number
   return actions.map((action) => ({ action, weight: 1 / Math.max(1, options.size) }));
 }
 
-/** Élément(s) d'une action et leur part : explicite, celui de la carte, tous, ou un au hasard. */
+/**
+ * Élément(s) d'une action et leur part : un au hasard, explicite, celui de la carte, ou tous.
+ * Une action « Random » est toujours répartie : les données lui donnent parfois quand même
+ * l'élément de la carte (Aidan, « Bonus (+10) dans un élément aléatoire »).
+ */
 function elementShares(action: CardAction, card: CardData, text: string, context: StatsContext): ElementAmounts {
+  const elements = context.baseElements;
+  if (/Random/.test(action.effect)) {
+    return Object.fromEntries(elements.map((element) => [element, 1 / elements.length]));
+  }
   if (action.element !== null) {
     return { [action.element]: 1 };
   }
   if (action.effect === CARD_ELEMENT_DAMAGE) {
     return { [card.element]: 1 };
   }
-  const elements = context.baseElements;
   if (EVERY_ELEMENT.test(text)) {
     return Object.fromEntries(elements.map((element) => [element, 1]));
   }
-  if (/Random/.test(action.effect) || RANDOM_ELEMENT.test(text)) {
+  if (RANDOM_ELEMENT.test(text)) {
     return Object.fromEntries(elements.map((element) => [element, 1 / elements.length]));
   }
   return {};

@@ -87,9 +87,16 @@ describe('computeCardStats', () => {
         { effectRich: '{kw:choice}Choix{/kw}' },
       ),
       ability([action('AddAllPlayerAttackRandomTeam', 'other', null, 6)], { effect: 'Bonus (+6) dans un élément aléatoire' }),
+      // Données incohérentes (Aidan) : l'action aléatoire porte l'élément de la carte.
+      ability([action('AddAllPlayerAttackRandomTeam', 'other', 'fire', 12)], { effect: 'Bonus (+12) dans un élément aléatoire' }),
     ]);
     assert.deepEqual(choice?.damage.map((line) => line.weight), [0.5, 0.5]);
     assert.deepEqual(random?.bonus[0]?.elements, Object.fromEntries(BASE.map((element) => [element, 1 / 6])));
+    assert.deepEqual(
+      model([ability([action('AddAllPlayerAttackRandomTeam', 'other', 'fire', 12)], { effect: 'Bonus (+12) dans un élément aléatoire' })])[0]
+        ?.bonus[0]?.elements,
+      Object.fromEntries(BASE.map((element) => [element, 1 / 6])),
+    );
   });
 
   it('relève les croissances par utilisation', () => {
