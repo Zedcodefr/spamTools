@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared-kernel" },
+    { "path": "packages/database" },
+    { "path": "packages/data-import" },
+    { "path": "apps/api" }
+  ]
+}

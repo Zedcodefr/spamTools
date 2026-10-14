@@ -1,0 +1,17 @@
+/**
+ * Objet valeur : immuable, défini uniquement par ses attributs.
+ */
+export abstract class ValueObject<TProps extends object> {
+  protected readonly props: Readonly<TProps>;
+
+  protected constructor(props: TProps) {
+    this.props = Object.freeze({ ...props });
+  }
+
+  equals(other?: ValueObject<TProps>): boolean {
+    if (other === undefined || other.constructor !== this.constructor) {
+      return false;
+    }
+    return JSON.stringify(this.props) === JSON.stringify(other.props);
+  }
+}

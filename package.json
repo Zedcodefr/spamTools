@@ -1,14 +1,24 @@
 {
   "name": "spamtools",
   "version": "1.0.0",
-  "description": "Projet Electron de base",
-  "main": "src/main.js",
-  "scripts": {
-    "start": "electron ."
-  },
-  "author": "",
+  "private": true,
+  "description": "spamTools - monorepo (React + API Node, DDD)",
   "license": "Apache-2.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b --noEmit && pnpm --filter @spamtools/web typecheck",
+    "dev": "pnpm build && concurrently -k -n tsc,api,web -c blue,green,magenta \"tsc -b -w --preserveWatchOutput\" \"pnpm --filter @spamtools/api dev\" \"pnpm --filter @spamtools/web dev\"",
+    "start": "pnpm --filter @spamtools/api start"
+  },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=26.11.1",
+    "pnpm": ">=12.6.0"
   }
 }
