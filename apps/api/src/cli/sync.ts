@@ -18,7 +18,7 @@ async function main(): Promise<number> {
     options: {
       version: { type: 'string' },
       all: { type: 'boolean', default: false },
-      language: { type: 'string', default: 'fr' },
+      language: { type: 'string' },
       help: { type: 'boolean', short: 'h', default: false },
     },
   });
@@ -36,11 +36,12 @@ async function main(): Promise<number> {
     ? (await new SpamGameCatalogSource().fetchIndex()).versions.map((version) => version.value)
     : [values.version];
 
-  const container = await createContainer(loadConfig());
+  const config = loadConfig();
+  const container = await createContainer(config);
   try {
     let hasFailures = false;
     for (const version of versions) {
-      const result = await container.syncCatalog.execute({ language: values.language, version });
+      const result = await container.syncCatalog.execute({ language: values.language ?? config.language, version });
       report(result);
       hasFailures ||= result.assets.failures.length > 0;
     }

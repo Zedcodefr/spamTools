@@ -31,6 +31,18 @@ packages/
 - `container.ts` : racine de composition (branche les adaptateurs sur les ports).
 - `http/` : adaptateurs entrants (routes HTTP → cas d'utilisation).
 - `adapters/` : adaptateurs sortants propres à l'app.
+- `cli/` : commandes en ligne (`pnpm sync`).
+- `migrations.ts` : schéma de la base SQLite.
+
+Routes (lecture seule ; sans `version`, la plus récente importée est servie) :
+
+| Route                         | Contenu                                                        |
+|-------------------------------|----------------------------------------------------------------|
+| `GET /api/catalog?version=`   | Version, versions importées, éléments, raretés, mots-clés      |
+| `GET /api/cards?version=&element=&rarity=&q=` | Cartes filtrées (`q` : nom et textes, sans accents) |
+| `GET /api/cards/:id?version=` | Une carte                                                      |
+| `GET /api/card-layout`        | Plan de rendu des cartes publié par le jeu                     |
+| `GET /api/assets/<chemin>`    | Images (chemins renvoyés par les routes ci-dessus)             |
 
 ## apps/web (React)
 

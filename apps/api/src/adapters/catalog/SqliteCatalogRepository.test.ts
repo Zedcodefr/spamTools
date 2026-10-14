@@ -1,29 +1,11 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import { CatalogVersion, SyncCatalog, type AssetStore } from '@spamtools/card-catalog';
-import { SpamGameCatalogSource } from '@spamtools/card-catalog/infrastructure';
-import { cardDocument, cardsDocument, indexDocument, layoutDocument } from '@spamtools/card-catalog/testing';
 import { MigrateDatabase } from '@spamtools/database';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
 import { migrations } from '../../migrations.js';
+import { fakeSpamGameSource as fakeSource } from '../../test-support/fakeSpamGameSource.js';
 import { SqliteCatalogRepository } from './SqliteCatalogRepository.js';
-
-const BASE = 'https://example.test/data/';
-
-/** Source spamgame.com simulée : versions 1.9 et 1.10 (pour vérifier l'ordre numérique). */
-function fakeSource(): SpamGameCatalogSource {
-  const files: Record<string, unknown> = {
-    'index.json': indexDocument({ latest: '1.10', versions: [{ version: '1.9' }, { version: '1.10' }] }),
-    'layout.json': layoutDocument(),
-    '1.9/cards.fr.json': cardsDocument({ version: '1.9', cards: [cardDocument({ hp: 400 })] }),
-    '1.10/cards.fr.json': cardsDocument({ version: '1.10' }),
-  };
-  const fetchImpl = (async (input: string | URL | Request) => {
-    const body = files[String(input).slice(BASE.length)];
-    return body === undefined ? new Response('', { status: 404 }) : new Response(JSON.stringify(body));
-  }) as typeof fetch;
-  return new SpamGameCatalogSource(BASE, fetchImpl);
-}
 
 const noAssets: AssetStore = { has: async () => true, put: async () => undefined };
 
@@ -73,6 +55,7 @@ describe('SqliteCatalogRepository', () => {
     assert.equal((await repository.find('fr'))?.version.value, '1.10');
     assert.equal((await repository.find('fr', CatalogVersion.of('1.9')))?.cards[0]?.data.hp, 400);
     assert.equal(await repository.find('en'), undefined);
+    assert.deepEqual((await repository.listVersions('fr')).map((v) => v.value), ['1.10', '1.9']);
     assert.equal(await repository.has(CatalogVersion.of('1.9'), 'fr'), true);
   });
 

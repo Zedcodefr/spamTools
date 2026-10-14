@@ -6,6 +6,8 @@ import { InMemoryCatalogRepository } from '../infrastructure/InMemoryCatalogRepo
 import { parseCatalog, parseIndex, parseLayout } from '../infrastructure/spamgame/parseSpamGameDocuments.js';
 import { cardsDocument, indexDocument, layoutDocument } from '../test-support/spamGameFixtures.js';
 import { GetCard } from './GetCard.js';
+import { GetCardLayout } from './GetCardLayout.js';
+import { GetCatalogOverview } from './GetCatalogOverview.js';
 import { ListCards } from './ListCards.js';
 import { NotFoundError } from './errors.js';
 import type { AssetStore, CatalogIndex, CatalogSource, FetchedCatalog } from './ports/index.js';
@@ -138,5 +140,29 @@ describe('ListCards / GetCard', () => {
     await new SyncCatalog(new FakeSource(), repository, new FakeAssetStore()).execute({ language: 'fr' });
     const { cards } = await new ListCards(repository).execute({ language: 'fr', element: 'fire' });
     assert.deepEqual(cards.map((card) => card.name), ['Esprit Feu']);
+  });
+});
+
+describe('GetCatalogOverview / GetCardLayout', () => {
+  it('décrit la version demandée et liste les versions importées', async () => {
+    const repository = new InMemoryCatalogRepository();
+    const sync = new SyncCatalog(new FakeSource(), repository, new FakeAssetStore());
+    await sync.execute({ language: 'fr', version: '1.20' });
+    await sync.execute({ language: 'fr' });
+
+    const overview = await new GetCatalogOverview(repository).execute({ language: 'fr' });
+
+    assert.equal(overview.version, '1.21');
+    assert.deepEqual(overview.availableVersions, ['1.21', '1.20']);
+    assert.equal(overview.cardCount, 2);
+    assert.deepEqual(overview.elements.map((element) => element.id), ['fire', 'water']);
+    assert.equal((await new GetCatalogOverview(repository).execute({ language: 'fr', version: '1.20' })).version, '1.20');
+    assert.equal((await new GetCardLayout(repository).execute())['width'], 961);
+  });
+
+  it('signale un catalogue ou un plan absents', async () => {
+    const repository = new InMemoryCatalogRepository();
+    await assert.rejects(new GetCatalogOverview(repository).execute({ language: 'fr' }), NotFoundError);
+    await assert.rejects(new GetCardLayout(repository).execute(), NotFoundError);
   });
 });

@@ -1,4 +1,11 @@
-import { GetCard, ListCards, SyncCatalog } from '@spamtools/card-catalog';
+import {
+  GetCard,
+  GetCardLayout,
+  GetCatalogOverview,
+  ListCards,
+  SyncCatalog,
+  type CatalogSource,
+} from '@spamtools/card-catalog';
 import { FileSystemAssetStore, SpamGameCatalogSource } from '@spamtools/card-catalog/infrastructure';
 import { MigrateDatabase } from '@spamtools/database';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
@@ -10,22 +17,30 @@ import { migrations } from './migrations.js';
  * Racine de composition : seul endroit où les implémentations techniques
  * sont branchées sur les ports métier. Ouvre la base et applique les migrations.
  */
-export async function createContainer(config: AppConfig) {
+export interface ContainerOverrides {
+  /** Remplace spamgame.com (tests). */
+  readonly catalogSource?: CatalogSource;
+}
+
+export async function createContainer(config: AppConfig, overrides: ContainerOverrides = {}) {
   const database = new SqliteDatabase(config.databasePath);
   await database.open();
   await new MigrateDatabase(new SqlMigrationSource(database, migrations), new SqliteMigrationJournal(database)).execute();
 
   const catalogs = new SqliteCatalogRepository(database);
   const syncCatalog = new SyncCatalog(
-    new SpamGameCatalogSource(),
+    overrides.catalogSource ?? new SpamGameCatalogSource(),
     catalogs,
     new FileSystemAssetStore(config.assetsDirectory),
   );
 
   return {
+    config,
     syncCatalog,
     listCards: new ListCards(catalogs),
     getCard: new GetCard(catalogs),
+    getCatalogOverview: new GetCatalogOverview(catalogs),
+    getCardLayout: new GetCardLayout(catalogs),
     close: () => database.close(),
   };
 }

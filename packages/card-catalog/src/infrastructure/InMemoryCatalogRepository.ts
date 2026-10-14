@@ -13,6 +13,13 @@ export class InMemoryCatalogRepository implements CatalogRepository {
     this.catalogs.set(key(catalog.version, catalog.language), catalog);
   }
 
+  async listVersions(language: string): Promise<CatalogVersion[]> {
+    return [...this.catalogs.values()]
+      .filter((catalog) => catalog.language === language)
+      .map((catalog) => catalog.version)
+      .sort((a, b) => b.compareTo(a));
+  }
+
   async find(language: string, version?: CatalogVersion): Promise<Catalog | undefined> {
     if (version !== undefined) {
       return this.catalogs.get(key(version, language));

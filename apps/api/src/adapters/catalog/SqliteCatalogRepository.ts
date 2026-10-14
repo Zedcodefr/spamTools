@@ -81,8 +81,17 @@ export class SqliteCatalogRepository implements CatalogRepository {
     });
   }
 
+  async listVersions(language: string): Promise<CatalogVersion[]> {
+    // Tri en code : un tri SQL sur le texte placerait "1.9" après "1.10".
+    return this.database.connection
+      .prepare('SELECT version FROM catalog WHERE language = ?')
+      .all(language)
+      .map((row) => CatalogVersion.of(text(row, 'version')))
+      .sort((a, b) => b.compareTo(a));
+  }
+
   async find(language: string, version?: CatalogVersion): Promise<Catalog | undefined> {
-    const target = version ?? this.latestVersion(language);
+    const target = version ?? (await this.listVersions(language))[0];
     if (target === undefined) {
       return undefined;
     }
@@ -110,18 +119,6 @@ export class SqliteCatalogRepository implements CatalogRepository {
   async findLayout(): Promise<CardLayout | undefined> {
     const row = this.database.connection.prepare('SELECT document FROM card_layout WHERE id = 1').get();
     return row === undefined ? undefined : CardLayout.of(JSON.parse(text(row, 'document')));
-  }
-
-  private latestVersion(language: string): CatalogVersion | undefined {
-    // Tri en code : un tri SQL sur le texte placerait "1.9" après "1.10".
-    return this.database.connection
-      .prepare('SELECT version FROM catalog WHERE language = ?')
-      .all(language)
-      .map((row) => CatalogVersion.of(text(row, 'version')))
-      .reduce<CatalogVersion | undefined>(
-        (latest, candidate) => (latest === undefined || candidate.compareTo(latest) > 0 ? candidate : latest),
-        undefined,
-      );
   }
 
   private load(version: CatalogVersion, language: string): Catalog | undefined {
