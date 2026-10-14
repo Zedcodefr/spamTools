@@ -1,0 +1,9 @@
+# Tout ce qui est reconstruit ou propre à la machine : jamais dans le contexte de build.
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+data
+.git
+.idea
+.env
+deploy/.env

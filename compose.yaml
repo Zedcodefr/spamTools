@@ -1,0 +1,47 @@
+# Déploiement : application + Caddy (HTTPS automatique Let's Encrypt, mot de passe d'accès).
+# Préparer deploy/.env (voir deploy/.env.example), puis :
+#   docker compose --env-file deploy/.env up -d --build
+#   docker compose --env-file deploy/.env run --rm app sync --all
+name: spamtools
+
+services:
+  app:
+    build: .
+    image: spamtools:latest
+    restart: unless-stopped
+    volumes:
+      - spamtools-data:/data
+    # Pas de port publié : seul Caddy est exposé.
+    expose:
+      - "3000"
+    # Aussi dans le Dockerfile ; repris ici pour les moteurs qui l'ignorent (images au format OCI, Podman).
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?définir DOMAIN dans deploy/.env}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?définir BASIC_AUTH_USER dans deploy/.env}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?définir BASIC_AUTH_HASH dans deploy/.env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  spamtools-data:
+  caddy-data:
+  caddy-config:

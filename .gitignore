@@ -4,3 +4,5 @@ out/
 *.tsbuildinfo
 data/
 .idea/
+deploy/.env
+.env

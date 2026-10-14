@@ -157,3 +157,35 @@ carte, stable d'une version à l'autre). « Tout sélectionner / désélectionne
 filtres compris ; « Afficher » : toutes, possédées ou manquantes. Dans le deck builder, « Uniquement mes
 cartes » limite l'autocomplétion aux cartes possédées.
 
+## Déploiement (Docker, ex. VPS OVH)
+
+Une image unique (`Dockerfile`) : l'API Node sert aussi le front compilé. `compose.yaml` y ajoute **Caddy**,
+qui obtient le certificat HTTPS (Let's Encrypt) et protège l'accès par **mot de passe** : l'application n'a
+pas de comptes, sans lui n'importe qui pourrait modifier les decks et la collection. Les données (base
+SQLite, images) sont dans le volume `spamtools-data`.
+
+**Prérequis** : un serveur avec Docker et Docker Compose (Ubuntu : `curl -fsSL https://get.docker.com | sh`),
+un nom de domaine dont l'enregistrement DNS A (et AAAA si IPv6) pointe vers l'IP du serveur, les ports 80
+et 443 ouverts (pare-feu OVH et `ufw` le cas échéant).
+
+```sh
+git clone <dépôt> spamtools && cd spamtools
+cp deploy/.env.example deploy/.env
+docker run --rm caddy:2.10-alpine caddy hash-password --plaintext 'mot-de-passe'   # empreinte bcrypt
+nano deploy/.env        # DOMAIN, BASIC_AUTH_USER, BASIC_AUTH_HASH (doubler chaque $ en $$)
+
+docker compose --env-file deploy/.env up -d --build          # démarre l'app et Caddy
+docker compose --env-file deploy/.env run --rm app sync --all  # première importation des cartes
+```
+
+| Tâche | Commande |
+|---|---|
+| Synchroniser les cartes (nouveau patch) | `docker compose --env-file deploy/.env run --rm app sync` |
+| Mettre à jour l'application | `git pull && docker compose --env-file deploy/.env up -d --build` |
+| Journaux | `docker compose --env-file deploy/.env logs -f app` |
+| Sauvegarder les données | `docker compose --env-file deploy/.env stop app && docker run --rm -v spamtools_spamtools-data:/data -v "$PWD":/backup alpine tar czf /backup/spamtools-data.tgz -C /data . && docker compose --env-file deploy/.env start app` |
+
+Réglages de l'image (variables d'environnement) : `PORT` (3000), `HOST` (0.0.0.0), `SPAMTOOLS_DATA_DIR`
+(`/data`), `SPAMTOOLS_WEB_DIR` (front compilé, `/app/web`). Le site reste soumis aux conditions d'utilisation
+des données de cartes (projet non commercial, artistes crédités, mention « non officiel »).
+

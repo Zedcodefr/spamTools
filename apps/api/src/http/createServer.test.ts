@@ -6,6 +6,7 @@ import { after, before, describe, it } from 'node:test';
 import type { FastifyInstance } from 'fastify';
 import { createContainer, type Container } from '../container.js';
 import { fakeSpamGameSource } from '../test-support/fakeSpamGameSource.js';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from './createServer.js';
 
 const FIRE_SPIRIT = '18bca5cf-7aa1-421c-85ec-4ed0b6a8ca70';
@@ -17,8 +18,17 @@ describe('API catalogue', () => {
 
   before(async () => {
     directory = await mkdtemp(path.join(tmpdir(), 'spamtools-api-'));
+    const web = path.join(directory, 'web');
+    await mkdir(path.join(web, 'assets'), { recursive: true });
+    await writeFile(path.join(web, 'index.html'), '<!doctype html><title>spamTools</title>');
+    await writeFile(path.join(web, 'assets', 'app-abc123.js'), 'console.log(1)');
     container = await createContainer(
-      { databasePath: ':memory:', language: 'fr', assetsDirectory: path.join(directory, 'assets') },
+      {
+        databasePath: ':memory:',
+        language: 'fr',
+        assetsDirectory: path.join(directory, 'assets'),
+        webDirectory: web,
+      },
       { catalogSource: fakeSpamGameSource() },
     );
     await container.syncCatalog.execute({ language: 'fr', version: '1.9' });
@@ -77,6 +87,27 @@ describe('API catalogue', () => {
     assert.equal(response.statusCode, 200);
     assert.equal(response.headers['content-type'], 'image/webp');
     assert.equal(response.body, 'image:img/elements/fire.webp');
+  });
+
+  describe('front compilé', () => {
+    it('sert les fichiers, avec cache long pour /assets', async () => {
+      const script = await get('/assets/app-abc123.js');
+      assert.equal(script.statusCode, 200);
+      assert.match(String(script.headers['content-type']), /javascript/);
+      assert.match(String(script.headers['cache-control']), /immutable/);
+    });
+
+    it('renvoie index.html pour les routes du front, jamais en dehors du dossier', async () => {
+      for (const url of ['/', '/deck', '/collection?x=1', '/../../package.json', '/%2e%2e/%2e%2e/package.json']) {
+        const response = await get(url);
+        assert.equal(response.statusCode, 200, url);
+        assert.match(response.body, /<title>spamTools<\/title>/, url);
+      }
+    });
+
+    it("laisse les routes /api inconnues en 404", async () => {
+      assert.equal((await get('/api/inexistante')).statusCode, 404);
+    });
   });
 
   describe('collection', () => {
@@ -182,8 +213,11 @@ describe('API catalogue', () => {
     '/api/assets/%2E%2E/%2E%2E/package.json',
     '/api/assets/img/elements',
   ]) {
-    it(`GET ${url} répond 404`, async () => {
-      assert.equal((await get(url)).statusCode, 404);
+    it(`GET ${url} ne sert aucun fichier hors des images`, async () => {
+      const response = await get(url);
+      // 404, ou le front (index.html) quand l'URL normalisée sort de /api : jamais le fichier visé.
+      assert.ok(response.statusCode === 404 || response.body.includes('<title>spamTools</title>'), url);
+      assert.doesNotMatch(response.body, /"name"|@spamtools/);
     });
   }
 });

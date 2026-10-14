@@ -5,6 +5,7 @@ import { assetRoutes } from './assetRoutes.js';
 import { catalogRoutes } from './catalogRoutes.js';
 import { collectionRoutes } from './collectionRoutes.js';
 import { deckRoutes } from './deckRoutes.js';
+import { webRoutes } from './webRoutes.js';
 
 export function createServer(container: Container, { logger = true }: { logger?: boolean } = {}): FastifyInstance {
   const app = Fastify({ logger });
@@ -25,6 +26,9 @@ export function createServer(container: Container, { logger = true }: { logger?:
   app.register(catalogRoutes, { container });
   app.register(deckRoutes, { container });
   app.register(collectionRoutes, { container });
+  if (container.config.webDirectory !== undefined) {
+    app.register(webRoutes, { webDirectory: container.config.webDirectory });
+  }
   app.register(assetRoutes, { assetsDirectory: container.config.assetsDirectory });
 
   return app;
