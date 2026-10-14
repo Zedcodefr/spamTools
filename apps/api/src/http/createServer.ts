@@ -1,9 +1,9 @@
-import { NotFoundError } from '@spamtools/card-catalog';
-import { DomainError } from '@spamtools/shared-kernel';
+import { DomainError, NotFoundError } from '@spamtools/shared-kernel';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Container } from '../container.js';
 import { assetRoutes } from './assetRoutes.js';
 import { catalogRoutes } from './catalogRoutes.js';
+import { deckRoutes } from './deckRoutes.js';
 
 export function createServer(container: Container, { logger = true }: { logger?: boolean } = {}): FastifyInstance {
   const app = Fastify({ logger });
@@ -22,6 +22,7 @@ export function createServer(container: Container, { logger = true }: { logger?:
 
   app.get('/api/health', async () => ({ status: 'ok' }));
   app.register(catalogRoutes, { container });
+  app.register(deckRoutes, { container });
   app.register(assetRoutes, { assetsDirectory: container.config.assetsDirectory });
 
   return app;

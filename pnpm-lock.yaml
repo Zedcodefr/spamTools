@@ -184,6 +184,9 @@ importers:
       '@spamtools/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@spamtools/deck':
+        specifier: workspace:*
+        version: link:../../packages/deck
       '@spamtools/shared-kernel':
         specifier: workspace:*
         version: link:../../packages/shared-kernel
@@ -223,6 +226,12 @@ importers:
         version: link:../shared-kernel
 
   packages/database:
+    dependencies:
+      '@spamtools/shared-kernel':
+        specifier: workspace:*
+        version: link:../shared-kernel
+
+  packages/deck:
     dependencies:
       '@spamtools/shared-kernel':
         specifier: workspace:*

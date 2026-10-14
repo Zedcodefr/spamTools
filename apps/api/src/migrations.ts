@@ -224,4 +224,29 @@ export const migrations: readonly SqlMigration[] = [
       UPDATE catalog SET analysis_version = NULL;
     `,
   },
+  {
+    version: 5,
+    name: 'create_decks',
+    sql: `
+      -- Decks composés par l'utilisateur : 4 cartes au plus, chacune avec son talent.
+      CREATE TABLE deck (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        version     TEXT NOT NULL,
+        language    TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      -- Pas de clé étrangère vers card : un deck reste lisible même si sa version n'est plus importée.
+      CREATE TABLE deck_slot (
+        deck_id      TEXT NOT NULL REFERENCES deck (id) ON DELETE CASCADE,
+        position     INTEGER NOT NULL,
+        card_id      TEXT NOT NULL,
+        talent_slot  INTEGER NOT NULL,
+        PRIMARY KEY (deck_id, position),
+        UNIQUE (deck_id, card_id)
+      );
+    `,
+  },
 ];

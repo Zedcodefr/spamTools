@@ -18,8 +18,10 @@ export interface StatContribution {
   readonly resistances: ElementAmounts;
   /** Ajout aux résistances de toutes les cartes alliées, elle comprise (%). */
   readonly allyResistances: ElementAmounts;
-  /** Dégâts infligés par tour. */
+  /** Dégâts infligés par tour, hors bonus élémentaires accumulés. */
   readonly damagePerTurn: ElementAmounts;
+  /** Soins par tour, hors bonus élémentaires accumulés. */
+  readonly healPerTurn: ElementAmounts;
   /** Éléments générés par tour (bonus élémentaires). */
   readonly generatedPerTurn: ElementAmounts;
   /** Éléments consommés par tour (coûts des capacités). */
@@ -32,6 +34,11 @@ export interface StatContribution {
 export interface CardStats {
   /** Carte seule : résistances de base, capacités, tox. */
   readonly base: StatContribution;
+  /**
+   * Coefficient appliqué aux bonus élémentaires pour les dégâts et soins de cette carte :
+   * 2 avec le tox Multiplicateur (« bonus élémentaires doublés »), 1 sinon.
+   */
+  readonly bonusFactor: number;
   /** Apport de chaque talent, par emplacement (un seul est choisi dans un deck). */
   readonly talents: Readonly<Record<string, StatContribution>>;
 }

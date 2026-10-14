@@ -1,0 +1,20 @@
+{
+  "name": "@spamtools/deck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Decks : composition (4 cartes et leur talent), enregistrement et analyse",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./infrastructure": { "types": "./dist/infrastructure/index.d.ts", "default": "./dist/infrastructure/index.js" }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "tsc -b && node --test \"dist/**/*.test.js\""
+  },
+  "dependencies": {
+    "@spamtools/shared-kernel": "workspace:*"
+  }
+}

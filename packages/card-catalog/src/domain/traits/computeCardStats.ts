@@ -38,6 +38,8 @@ export interface StatsContext {
 }
 
 const PUNCHING_BAG_KEY = 'sac de frappe';
+/** Tox « Multiplicateur » : bonus élémentaires doublés pour les dégâts et soins de la carte. */
+const MULTIPLIER_KEY = 'multiplicateur';
 
 /**
  * Statistiques chiffrées d'une carte : celles de la carte seule et l'apport de chacun de ses talents.
@@ -58,7 +60,8 @@ export function computeCardStats(card: CardData, context: StatsContext): CardSta
   for (const talent of card.talents) {
     talents[String(talent.slot)] = talentContribution(talent, card, context).toStats();
   }
-  return { base: base.toStats(), talents };
+  const bonusFactor = card.skills.some((skill) => context.keyOf(skill.name) === MULTIPLIER_KEY) ? 2 : 1;
+  return { base: base.toStats(), bonusFactor, talents };
 }
 
 function addAbility(stats: Contribution, ability: Ability, card: CardData, context: StatsContext): void {
@@ -88,6 +91,14 @@ function addAbility(stats: Contribution, ability: Ability, card: CardData, conte
       }
       for (const [element, share] of shares) {
         stats.add('damagePerTurn', element, (value * targets * hitChance * critFactor * weight * share) / period);
+      }
+    } else if (action.kind === 'heal') {
+      const shares = elementShares(action, card, text, context);
+      if (shares.length === 0) {
+        stats.note(ability.name, 'soin sans élément : non compté dans les soins par élément');
+      }
+      for (const [element, share] of shares) {
+        stats.add('healPerTurn', element, (value * hitChance * critFactor * weight * share) / period);
       }
     } else if (BONUS_EFFECT.test(action.effect)) {
       for (const [element, share] of elementShares(action, card, text, context)) {
@@ -217,6 +228,7 @@ class Contribution {
     resistances: {},
     allyResistances: {},
     damagePerTurn: {},
+    healPerTurn: {},
     generatedPerTurn: {},
     consumedPerTurn: {},
     startingBonus: {},
@@ -243,6 +255,7 @@ class Contribution {
       resistances: round(this.amounts.resistances),
       allyResistances: round(this.amounts.allyResistances),
       damagePerTurn: round(this.amounts.damagePerTurn),
+      healPerTurn: round(this.amounts.healPerTurn),
       generatedPerTurn: round(this.amounts.generatedPerTurn),
       consumedPerTurn: round(this.amounts.consumedPerTurn),
       startingBonus: round(this.amounts.startingBonus),

@@ -4,6 +4,7 @@
     { "path": "packages/shared-kernel" },
     { "path": "packages/database" },
     { "path": "packages/card-catalog" },
+    { "path": "packages/deck" },
     { "path": "apps/api" }
   ]
 }

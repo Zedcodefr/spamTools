@@ -79,6 +79,55 @@ describe('API catalogue', () => {
     assert.equal(response.body, 'image:img/elements/fire.webp');
   });
 
+  describe('decks', () => {
+    const send = (method: 'POST' | 'PUT', url: string, payload: Record<string, unknown>) =>
+      app.inject({ method, url, payload });
+
+    it('crée, modifie, liste et supprime un deck', async () => {
+      const created = await send('POST', '/api/decks', {
+        name: 'Test',
+        version: '1.10',
+        slots: [{ cardId: FIRE_SPIRIT, talentSlot: 1 }],
+      });
+      assert.equal(created.statusCode, 201);
+      const { id } = created.json();
+
+      const updated = await send('PUT', `/api/decks/${id}`, {
+        name: 'Test 2',
+        version: '1.10',
+        slots: [],
+      });
+      assert.equal(updated.statusCode, 200);
+      assert.deepEqual(updated.json().slots, []);
+      assert.deepEqual((await get('/api/decks')).json().map((deck: { name: string }) => deck.name), ['Test 2']);
+
+      assert.equal((await app.inject({ method: 'DELETE', url: `/api/decks/${id}` })).statusCode, 204);
+      assert.equal((await get(`/api/decks/${id}`)).statusCode, 404);
+    });
+
+    it('refuse un doublon (400), plus de 4 cartes (400) ou une carte inconnue (404)', async () => {
+      const deck = (slots: unknown[]) => send('POST', '/api/decks', { name: 'X', version: '1.10', slots });
+      const fire = { cardId: FIRE_SPIRIT, talentSlot: 1 };
+      assert.equal((await deck([fire, fire])).statusCode, 400);
+      assert.equal((await deck([fire, fire, fire, fire, fire])).statusCode, 400);
+      assert.equal((await deck([{ cardId: 'inconnue', talentSlot: 1 }])).statusCode, 404);
+      assert.equal((await deck([{ cardId: FIRE_SPIRIT, talentSlot: 9 }])).statusCode, 404);
+    });
+
+    it('analyse une composition avec la projection des bonus', async () => {
+      const response = await send('POST', '/api/decks/analysis', {
+        version: '1.10',
+        slots: [{ cardId: FIRE_SPIRIT, talentSlot: 1 }],
+        turns: 3,
+      });
+      assert.equal(response.statusCode, 200);
+      const analysis = response.json();
+      assert.ok(analysis.damagePerTurn.fire > 0);
+      assert.equal(analysis.turns.length, 3);
+      assert.ok(analysis.averageResistances.fire !== undefined);
+    });
+  });
+
   for (const url of [
     '/api/assets/img/elements/absent.webp',
     '/api/assets/../../package.json',

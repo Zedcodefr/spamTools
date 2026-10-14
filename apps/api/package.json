@@ -15,6 +15,7 @@
   "dependencies": {
     "@spamtools/card-catalog": "workspace:*",
     "@spamtools/database": "workspace:*",
+    "@spamtools/deck": "workspace:*",
     "@spamtools/shared-kernel": "workspace:*",
     "fastify": "^5.12.7"
   }

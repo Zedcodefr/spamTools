@@ -86,6 +86,13 @@ describe('computeCardStats', () => {
     assert.deepEqual(base.generatedPerTurn, Object.fromEntries(BASE.map((element) => [element, 1])));
   });
 
+  it('compte les soins par élément, avec précision et critique', () => {
+    const base = stats({
+      abilities: [ability([action('healTarget', 'heal', 'light', 20)], { cooldown: 2, critChance: 50, critMultiplier: 3 })],
+    }).base;
+    assert.deepEqual(base.healPerTurn, { light: (20 * 2) / 2 });
+  });
+
   it('compte les coûts en éléments et signale les autres', () => {
     const base = stats({
       abilities: [
@@ -117,6 +124,15 @@ describe('computeCardStats', () => {
     }).base;
     assert.deepEqual(base.generatedPerTurn, { fire: 2 });
     assert.deepEqual(base.unquantified.map((note) => note.source), ['Sac de frappe']);
+  });
+
+  it('double les bonus élémentaires avec le tox Multiplicateur', () => {
+    const multiplier = {
+      id: 'Multiplicator_R', name: 'Multiplicateur', effect: '', effectRich: '', rarity: 'rare', element: null, value: 0,
+      icon: null,
+    };
+    assert.equal(stats({ skills: [multiplier] }).bonusFactor, 2);
+    assert.equal(stats({}).bonusFactor, 1);
   });
 
   it("calcule l'apport de chaque talent", () => {
