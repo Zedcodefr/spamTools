@@ -3,6 +3,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Container } from '../container.js';
 import { assetRoutes } from './assetRoutes.js';
 import { catalogRoutes } from './catalogRoutes.js';
+import { collectionRoutes } from './collectionRoutes.js';
 import { deckRoutes } from './deckRoutes.js';
 
 export function createServer(container: Container, { logger = true }: { logger?: boolean } = {}): FastifyInstance {
@@ -23,6 +24,7 @@ export function createServer(container: Container, { logger = true }: { logger?:
   app.get('/api/health', async () => ({ status: 'ok' }));
   app.register(catalogRoutes, { container });
   app.register(deckRoutes, { container });
+  app.register(collectionRoutes, { container });
   app.register(assetRoutes, { assetsDirectory: container.config.assetsDirectory });
 
   return app;

@@ -3,6 +3,7 @@ import type { Card } from '../domain/Card.ts';
 import { CardDetailProvider } from './card/CardDetailProvider.tsx';
 import { useCardDetail } from './card/CardDetailContext.tsx';
 import { CardEnvironmentProvider, type CardEnvironment } from './card/CardEnvironment.tsx';
+import { CollectionPage } from './collection/CollectionPage.tsx';
 import { DeckBuilderPage } from './deck/DeckBuilderPage.tsx';
 import { useGateways } from './GatewaysContext.tsx';
 import { SpamDexPage } from './spamdex/SpamDexPage.tsx';
@@ -13,6 +14,7 @@ const CARD_PARAM = 'card';
 /** Outils de l'application, un chemin d'URL chacun. */
 const TOOLS = [
   { path: '/', label: 'SpamDex' },
+  { path: '/collection', label: 'Mes cartes' },
   { path: '/deck', label: 'Deck builder' },
 ] as const;
 
@@ -97,11 +99,9 @@ export function App() {
           <CardEnvironmentProvider value={environment}>
             <CardDetailProvider onChange={syncUrl}>
               <OpenCardFromUrl cards={state.data.cards} />
-              {tool === '/deck' ? (
-                <DeckBuilderPage data={state.data} onVersionChange={setVersion} />
-              ) : (
-                <SpamDexPage data={state.data} onVersionChange={setVersion} />
-              )}
+              {tool === '/deck' && <DeckBuilderPage data={state.data} onVersionChange={setVersion} />}
+              {tool === '/collection' && <CollectionPage data={state.data} onVersionChange={setVersion} />}
+              {tool === '/' && <SpamDexPage data={state.data} onVersionChange={setVersion} />}
             </CardDetailProvider>
           </CardEnvironmentProvider>
         )}

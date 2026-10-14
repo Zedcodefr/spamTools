@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HttpCatalogGateway } from './infrastructure/HttpCatalogGateway.ts';
+import { HttpCollectionGateway } from './infrastructure/HttpCollectionGateway.ts';
 import { HttpDeckGateway } from './infrastructure/HttpDeckGateway.ts';
 import { App } from './ui/App.tsx';
 import { GatewaysProvider, type Gateways } from './ui/GatewaysContext.tsx';
@@ -10,6 +11,7 @@ import './ui/styles.css';
 const gateways: Gateways = {
   catalog: new HttpCatalogGateway(),
   decks: new HttpDeckGateway(),
+  collection: new HttpCollectionGateway(),
 };
 
 const root = document.getElementById('root');

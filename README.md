@@ -11,6 +11,7 @@ packages/
   database/             Gestion BDD : connexion, migrations
   card-catalog/         Catalogue des cartes : modèle, synchro depuis spamgame.com, consultation
   deck/                 Decks : composition (4 cartes et leur talent), enregistrement, analyse
+  collection/           Mes cartes : les cartes que possède le joueur
 ```
 
 ## Couches (dans chaque package)
@@ -46,7 +47,8 @@ Routes (lecture seule ; sans `version`, la plus récente importée est servie) :
 | `GET /api/assets/<chemin>`    | Images (chemins renvoyés par les routes ci-dessus)             |
 | `GET/POST /api/decks`, `GET/PUT/DELETE /api/decks/:id` | Decks enregistrés                     |
 | `POST /api/decks/analysis`    | Analyse d'une composition `{ version, slots, turns }`          |
-| `POST /api/decks/suggestions` | Autocomplétion `{ version, slots, damage, healWeight, turns }` |
+| `POST /api/decks/suggestions` | Autocomplétion `{ version, slots, damage, healWeight, turns, excludedCardIds }` |
+| `GET /api/collection`, `PUT /api/collection/cards` | Cartes possédées `{ cardIds, owned }`      |
 
 ## apps/web (React)
 
@@ -147,4 +149,11 @@ et complète le deck, DPS compris, pour maximiser dégâts^(1 − p) × soins^p,
 un compromis qui exige les deux). Recherche (`searchDecks`) : construction carte par carte en gardant les
 meilleurs candidats, puis remplacements successifs, dans un budget de quelques secondes ; les talents sans
 effet chiffré sont fusionnés avec « aucun talent », le DPS n'est essayé que si un renfort ciblé existe.
+
+## Mes cartes (`/collection`)
+
+Toutes les cartes, clic gauche pour indiquer celles que l'on possède (enregistrées en base, par identifiant de
+carte, stable d'une version à l'autre). « Tout sélectionner / désélectionner » agit sur les cartes affichées,
+filtres compris ; « Afficher » : toutes, possédées ou manquantes. Dans le deck builder, « Uniquement mes
+cartes » limite l'autocomplétion aux cartes possédées.
 

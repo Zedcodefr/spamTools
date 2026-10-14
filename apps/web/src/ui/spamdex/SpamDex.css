@@ -273,3 +273,23 @@
     max-height: none;
   }
 }
+
+.collection__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.collection__tools label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+}
+
+.collection__count {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}

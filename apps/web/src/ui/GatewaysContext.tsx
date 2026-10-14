@@ -1,5 +1,6 @@
 import { createContext, use, type ReactNode } from 'react';
 import type { CatalogGateway } from '../application/ports/CatalogGateway.ts';
+import type { CollectionGateway } from '../application/ports/CollectionGateway.ts';
 import type { DeckGateway } from '../application/ports/DeckGateway.ts';
 
 /**
@@ -9,6 +10,7 @@ import type { DeckGateway } from '../application/ports/DeckGateway.ts';
 export interface Gateways {
   readonly catalog: CatalogGateway;
   readonly decks: DeckGateway;
+  readonly collection: CollectionGateway;
 }
 
 const GatewaysContext = createContext<Gateways | null>(null);

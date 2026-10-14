@@ -32,8 +32,9 @@ export class HttpDeckGateway implements DeckGateway {
     slots: readonly DeckSlot[],
     objective: SuggestionObjective,
     turns: number,
+    excludedCardIds: readonly string[],
   ): Promise<{ readonly suggestions: readonly DeckSuggestion[]; readonly complete: boolean }> {
-    return this.request('POST', '/decks/suggestions', { version, slots, turns, ...objective });
+    return this.request('POST', '/decks/suggestions', { version, slots, turns, excludedCardIds, ...objective });
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {

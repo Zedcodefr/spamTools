@@ -278,4 +278,15 @@ export const migrations: readonly SqlMigration[] = [
       ALTER TABLE deck_slot_new RENAME TO deck_slot;
     `,
   },
+  {
+    version: 8,
+    name: 'create_collection',
+    sql: `
+      -- Cartes possédées par le joueur (identifiants stables d'une version du jeu à l'autre).
+      CREATE TABLE owned_card (
+        card_id   TEXT PRIMARY KEY,
+        added_at  TEXT NOT NULL
+      );
+    `,
+  },
 ];

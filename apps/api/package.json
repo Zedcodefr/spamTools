@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@spamtools/card-catalog": "workspace:*",
+    "@spamtools/collection": "workspace:*",
     "@spamtools/database": "workspace:*",
     "@spamtools/deck": "workspace:*",
     "@spamtools/shared-kernel": "workspace:*",

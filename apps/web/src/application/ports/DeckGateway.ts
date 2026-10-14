@@ -22,5 +22,6 @@ export interface DeckGateway {
     slots: readonly DeckSlot[],
     objective: SuggestionObjective,
     turns: number,
+    excludedCardIds: readonly string[],
   ): Promise<{ readonly suggestions: readonly DeckSuggestion[]; readonly complete: boolean }>;
 }

@@ -79,6 +79,17 @@ describe('API catalogue', () => {
     assert.equal(response.body, 'image:img/elements/fire.webp');
   });
 
+  describe('collection', () => {
+    it('ajoute et retire des cartes possédées', async () => {
+      const put = (cardIds: string[], owned: boolean) =>
+        app.inject({ method: 'PUT', url: '/api/collection/cards', payload: { cardIds, owned } });
+      assert.deepEqual((await put([FIRE_SPIRIT, 'autre'], true)).json().cardIds, [FIRE_SPIRIT, 'autre'].sort());
+      assert.deepEqual((await put(['autre'], false)).json().cardIds, [FIRE_SPIRIT]);
+      assert.deepEqual((await get('/api/collection')).json().cardIds, [FIRE_SPIRIT]);
+      assert.equal((await put([''], true)).statusCode, 400);
+    });
+  });
+
   describe('decks', () => {
     const send = (method: 'POST' | 'PUT', url: string, payload: Record<string, unknown>) =>
       app.inject({ method, url, payload });

@@ -7,10 +7,12 @@ import {
   type CatalogSource,
 } from '@spamtools/card-catalog';
 import { FileSystemAssetStore, SpamGameCatalogSource } from '@spamtools/card-catalog/infrastructure';
+import { GetCollection, SetCardsOwned } from '@spamtools/collection';
 import { MigrateDatabase } from '@spamtools/database';
 import { AnalyzeDeck, DeleteDeck, GetDeck, ListDecks, SaveDeck, SuggestDecks } from '@spamtools/deck';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
 import { SqliteCatalogRepository } from './adapters/catalog/SqliteCatalogRepository.js';
+import { SqliteCollectionRepository } from './adapters/collection/SqliteCollectionRepository.js';
 import { CatalogDeckCardStatsProvider } from './adapters/deck/CatalogDeckCardStatsProvider.js';
 import { SqliteDeckRepository } from './adapters/deck/SqliteDeckRepository.js';
 import type { AppConfig } from './config.js';
@@ -39,6 +41,7 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
 
   const decks = new SqliteDeckRepository(database);
   const deckCards = new CatalogDeckCardStatsProvider(catalogs);
+  const collection = new SqliteCollectionRepository(database);
 
   return {
     config,
@@ -53,6 +56,8 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     deleteDeck: new DeleteDeck(decks),
     analyzeDeck: new AnalyzeDeck(deckCards),
     suggestDecks: new SuggestDecks(deckCards),
+    getCollection: new GetCollection(collection),
+    setCardsOwned: new SetCardsOwned(collection),
     close: () => database.close(),
   };
 }

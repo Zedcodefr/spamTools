@@ -181,6 +181,9 @@ importers:
       '@spamtools/card-catalog':
         specifier: workspace:*
         version: link:../../packages/card-catalog
+      '@spamtools/collection':
+        specifier: workspace:*
+        version: link:../../packages/collection
       '@spamtools/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -220,6 +223,12 @@ importers:
         version: 8.3.4(@types/node@26.6.5)
 
   packages/card-catalog:
+    dependencies:
+      '@spamtools/shared-kernel':
+        specifier: workspace:*
+        version: link:../shared-kernel
+
+  packages/collection:
     dependencies:
       '@spamtools/shared-kernel':
         specifier: workspace:*

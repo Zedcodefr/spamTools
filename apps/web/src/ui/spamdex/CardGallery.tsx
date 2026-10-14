@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState, type ReactNode } from 'react';
 import { filterCards, NO_FILTERS, SORT_LABELS, sortCards, type CardSort, type SortKey } from '../../domain/cardQuery.ts';
 import type { Card } from '../../domain/Card.ts';
 import { GameCard } from '../card/GameCard.tsx';
@@ -18,6 +18,8 @@ export interface CardGalleryProps {
   /** Clic gauche sur une carte (ex. l'ajouter au deck). */
   readonly onSelectCard?: ((card: Card) => void) | undefined;
   readonly isCardSelected?: (card: Card) => boolean;
+  /** Contrôles propres à l'outil, sous la barre d'outils ; reçoit les cartes affichées (filtres compris). */
+  readonly toolbarExtra?: (visibleCards: readonly Card[]) => ReactNode;
 }
 
 /**
@@ -31,6 +33,7 @@ export function CardGallery({
   hint = 'Clic droit sur une carte pour afficher son détail.',
   onSelectCard,
   isCardSelected,
+  toolbarExtra,
 }: CardGalleryProps) {
   const { assetUrl } = useCardEnvironment();
   const [filters, setFilters] = useState(NO_FILTERS);
@@ -103,6 +106,7 @@ export function CardGallery({
           </label>
         </div>
 
+        {toolbarExtra?.(visibleCards)}
         <p className="spamdex__hint">{hint}</p>
 
         {visibleCards.length === 0 ? (

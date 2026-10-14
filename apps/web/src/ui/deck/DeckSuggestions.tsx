@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Card } from '../../domain/Card.ts';
 import type { DeckDraft, DeckSuggestion, SuggestionObjective } from '../../domain/Deck.ts';
+import { useCollection } from '../collection/useCollection.ts';
 import { useGateways } from '../GatewaysContext.tsx';
 
 const number = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
@@ -27,11 +28,17 @@ export function DeckSuggestions({ version, draft, turns, cardsById, onApply }: D
   const { decks: gateway } = useGateways();
   const [objective, setObjective] = useState<SuggestionObjective>({ damage: 'total', healWeight: 0 });
   const [state, setState] = useState<State>({ status: 'idle' });
+  const { owned } = useCollection();
+  const [onlyOwned, setOnlyOwned] = useState(false);
+  const ownedCount = owned === null ? 0 : [...cardsById.keys()].filter((id) => owned.has(id)).length;
 
   const search = async () => {
     setState({ status: 'loading' });
     try {
-      const result = await gateway.suggest(version, draft.slots, objective, turns);
+      // Uniquement mes cartes : on exclut celles qu'on ne possède pas (les cartes déjà placées restent).
+      const excluded =
+        onlyOwned && owned !== null ? [...cardsById.keys()].filter((id) => !owned.has(id)) : [];
+      const result = await gateway.suggest(version, draft.slots, objective, turns, excluded);
       setState({ status: 'ready', ...result });
     } catch (error) {
       setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
@@ -71,6 +78,15 @@ export function DeckSuggestions({ version, draft, turns, cardsById, onApply }: D
             value={weight}
             onChange={(event) => setObjective({ ...objective, healWeight: Number(event.target.value) / 100 })}
           />
+        </label>
+        <label className="deck-suggestions__owned" title="Ne propose que des cartes de « Mes cartes »">
+          <input
+            type="checkbox"
+            checked={onlyOwned}
+            disabled={ownedCount === 0}
+            onChange={(event) => setOnlyOwned(event.target.checked)}
+          />
+          Uniquement mes cartes ({ownedCount})
         </label>
         <button type="button" onClick={search} disabled={state.status === 'loading'}>
           {state.status === 'loading' ? 'Recherche…' : draft.slots.length === 0 ? 'Proposer' : 'Compléter'}

@@ -10,5 +10,6 @@
     { "path": "../../packages/database" },
     { "path": "../../packages/card-catalog" },
     { "path": "../../packages/deck" },
+    { "path": "../../packages/collection" },
   ]
 }
