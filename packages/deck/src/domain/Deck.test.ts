@@ -158,6 +158,13 @@ describe('analyzeDeck : simulation', () => {
     assert.deepEqual(damageByTurn(cards, 2), [11, 12]);
   });
 
+  it('ne compte un renfort que si la capacité qui le lance touche (précision)', () => {
+    const critBoost: Boost = { stat: 'critChance', amount: 20, target: 'self', chance: 1 };
+    // Précision 10 % : le renfort de +20 % ne s'applique qu'une fois sur dix -> +2 % par tour.
+    const cards = [cardStats('a', { abilities: [ability({ damage: [line(70)], precision: 10, boosts: [critBoost] })] })];
+    assert.equal(analyzeDeck(cards, { turns: 3 }).cards[0]?.finalBoosts.critChance, 6);
+  });
+
   it('applique les renforts ciblés au DPS choisi, et les signale sans DPS', () => {
     const precision: Boost = { stat: 'precision', amount: 50, target: 'dps', chance: 1 };
     const critRatio: Boost = { stat: 'critMultiplier', amount: 1, target: 'dps', chance: 1 };

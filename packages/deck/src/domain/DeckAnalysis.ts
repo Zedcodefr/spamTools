@@ -6,7 +6,8 @@
  * probabilité (suivie exactement : probabilité d'être prête à chaque tour).
  *
  * À chaque tour, dans l'ordre :
- * 1. renforts « à chaque tour » des talents, puis renforts des capacités utilisées ce tour ;
+ * 1. renforts « à chaque tour » des talents, puis renforts des capacités utilisées ce tour,
+ *    pondérés par leur précision (un renfort ne s'applique que si la capacité touche) ;
  * 2. éléments générés (précision et critique compris) et consommés : le stock compte dès ce tour ;
  * 3. dégâts et soins : précision, critique, dégâts de base et croissance des capacités accumulés,
  *    majorés de BONUS_RATE par point de stock de leur élément (×2 avec Multiplicateur).
@@ -286,8 +287,9 @@ function simulate(
         applyBoost(index, boost, 1, card.talentName ?? card.cardName);
       }
       abilities[index]?.forEach((ability, abilityIndex) => {
+        const landed = usedNow(index, abilityIndex) * hitChance(ability, boosts[index] as CardBoosts);
         for (const boost of ability.boosts) {
-          applyBoost(index, boost, usedNow(index, abilityIndex), ability.name);
+          applyBoost(index, boost, landed, ability.name);
         }
       });
     });
@@ -445,9 +447,14 @@ class CooldownSchedule {
   }
 }
 
+/** Probabilité qu'une capacité touche : sa précision, renforts compris (plafonnée à 100 %). */
+function hitChance(ability: AbilityModel, boosts: CardBoosts): number {
+  return clampRatio((ability.precision + boosts.precision) / 100);
+}
+
 /** Espérance de réussite × critique d'une capacité, renforts compris (plafonnés à 100 %). */
 function successFactor(ability: AbilityModel, boosts: CardBoosts): number {
-  const hit = clampRatio((ability.precision + boosts.precision) / 100);
+  const hit = hitChance(ability, boosts);
   const crit = clampRatio((ability.critChance + boosts.critChance) / 100);
   return hit * (1 + crit * (ability.critMultiplier + boosts.critMultiplier - 1));
 }
