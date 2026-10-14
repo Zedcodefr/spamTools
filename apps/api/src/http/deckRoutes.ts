@@ -7,7 +7,7 @@ const slotsSchema = {
   items: {
     type: 'object',
     required: ['cardId', 'talentSlot'],
-    properties: { cardId: { type: 'string', minLength: 1 }, talentSlot: { type: 'integer', minimum: 1 } },
+    properties: { cardId: { type: 'string', minLength: 1 }, talentSlot: { type: ['integer', 'null'], minimum: 1 } },
   },
 } as const;
 
@@ -25,13 +25,13 @@ const deckBody = {
 interface DeckBody {
   name: string;
   version: string;
-  slots: { cardId: string; talentSlot: number }[];
+  slots: { cardId: string; talentSlot: number | null }[];
   dpsCardId?: string | null;
 }
 
 interface AnalysisBody {
   version: string;
-  slots: { cardId: string; talentSlot: number }[];
+  slots: { cardId: string; talentSlot: number | null }[];
   turns?: number;
   dpsCardId?: string | null;
 }

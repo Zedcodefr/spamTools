@@ -117,6 +117,21 @@ describe('API catalogue', () => {
       assert.equal((await deck([{ cardId: FIRE_SPIRIT, talentSlot: 9 }])).statusCode, 404);
     });
 
+    it('accepte une carte sans talent', async () => {
+      const created = await send('POST', '/api/decks', {
+        name: 'Sans talent',
+        version: '1.10',
+        slots: [{ cardId: FIRE_SPIRIT, talentSlot: null }],
+      });
+      assert.equal(created.statusCode, 201);
+      assert.equal((await get(`/api/decks/${created.json().id}`)).json().slots[0].talentSlot, null);
+      const analysis = await send('POST', '/api/decks/analysis', {
+        version: '1.10',
+        slots: [{ cardId: FIRE_SPIRIT, talentSlot: null }],
+      });
+      assert.equal(analysis.json().cards[0].talentName, null);
+    });
+
     it('analyse une composition avec la projection des bonus', async () => {
       const response = await send('POST', '/api/decks/analysis', {
         version: '1.10',

@@ -1,9 +1,18 @@
 import type { DeckAnalysis, ElementAmounts } from '../../domain/Deck.ts';
 import { useCardEnvironment } from '../card/CardEnvironment.tsx';
+import { BarChart, LineChart, type ChartCategory } from '../charts/Charts.tsx';
 import type { AnalysisState } from './DeckBuilderPage.tsx';
 
 const MAX_TURNS = 50;
 const number = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+const compact = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1, notation: 'compact' });
+const formatValue = (value: number) => number.format(value);
+const formatAxis = (value: number) => compact.format(value);
+const formatPercent = (value: number) => `${number.format(value)} %`;
+const turnLabel = (x: number) => (x === 0 ? 'Départ' : `Tour ${x}`);
+
+const TOTAL = { key: 'total', label: 'Dégâts totaux', color: 'var(--chart-series-1)' };
+const SINGLE = { key: 'single', label: 'Cible unique', color: 'var(--chart-series-2)' };
 
 interface DeckAnalysisViewProps {
   readonly state: AnalysisState;
@@ -12,9 +21,9 @@ interface DeckAnalysisViewProps {
 }
 
 /**
- * Analyse du deck : simulation tour par tour en espérance. Élément par élément : résistances
- * moyennes (faiblesses en évidence), dégâts et soins moyens par tour, éléments générés et consommés ;
- * puis détail par carte (renforts cumulés) et par tour (stock de bonus).
+ * Analyse du deck en graphiques : dégâts tour par tour (départ à 0, avant les talents),
+ * dégâts et résistances par élément, éléments générés et consommés, stock de bonus par
+ * élément (petits multiples), dégâts par carte. Les données restent consultables en tableaux.
  */
 export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisViewProps) {
   const { catalog, assetUrl } = useCardEnvironment();
@@ -34,10 +43,9 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
   }
 
   const { analysis } = state;
-  const elementIds = [...catalog.elements.values()]
+  const elements: ChartCategory[] = [...catalog.elements.values()]
     .sort((a, b) => a.order - b.order)
-    .map((element) => element.id)
-    .filter((id) =>
+    .filter((element) =>
       [
         analysis.averageResistances,
         analysis.damagePerTurn,
@@ -45,15 +53,22 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
         analysis.generatedPerTurn,
         analysis.consumedPerTurn,
         analysis.startingBonus,
-      ].some((amounts) => amounts[id] !== undefined),
-    );
+      ].some((amounts) => amounts[element.id] !== undefined),
+    )
+    .map((element) => ({ key: element.id, label: element.name, icon: assetUrl(element.icon) }));
+  const amount = (amounts: ElementAmounts, id: string) => amounts[id] ?? 0;
   const weak = new Set(analysis.weaknesses);
-  const first = analysis.turns[0];
   const last = analysis.turns.at(-1);
-  const cell = (amounts: ElementAmounts, id: string) => {
-    const value = amounts[id];
-    return value === undefined || value === 0 ? '–' : number.format(value);
-  };
+
+  // Tour 0 : état de départ, avant toute action et avant l'application des talents.
+  const xs = [0, ...analysis.turns.map((turn) => turn.turn)];
+  const along = (pick: (turn: DeckAnalysis['turns'][number]) => number) => [0, ...analysis.turns.map(pick)];
+  const stockMax = Math.max(0, ...analysis.turns.flatMap((turn) => Object.values(turn.bonusStock)));
+  const stockElements = elements.filter((element) =>
+    analysis.turns.some((turn) => (turn.bonusStock[element.key] ?? 0) > 0),
+  );
+  const hasHeal = analysis.totalHealPerTurn > 0;
+  const hasConsumption = Object.keys(analysis.consumedPerTurn).length > 0;
 
   return (
     <section className="deck-analysis" aria-label="Analyse du deck">
@@ -62,13 +77,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
         <strong>{number.format(analysis.totalDamagePerTurn)}</strong> dégâts totaux par tour en moyenne sur{' '}
         {analysis.turns.length} tours, dont <strong>{number.format(analysis.totalSingleTargetDamagePerTurn)}</strong> sur
         une même carte adverse
-        {first && last && (
-          <>
-            {' '}
-            (de {number.format(first.totalDamage)} au tour 1 à {number.format(last.totalDamage)} au tour {last.turn})
-          </>
-        )}
-        {analysis.totalHealPerTurn > 0 && (
+        {hasHeal && (
           <>
             {' '}· <strong>{number.format(analysis.totalHealPerTurn)}</strong> soins par tour
           </>
@@ -77,99 +86,8 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
         {analysis.dpsCardId === null ? ' (aucun DPS choisi pour les renforts ciblés).' : '.'}
       </p>
 
-      <div className="deck-analysis__scroll">
-        <table className="deck-analysis__table">
-          <thead>
-            <tr>
-              <th scope="col">Élément</th>
-              <th scope="col" title="Résistance moyenne des cartes (%), talents et bonus d'équipe compris">
-                Rés.
-              </th>
-              <th scope="col" title={`Dégâts totaux par tour (toutes cibles), en moyenne sur ${analysis.turns.length} tours`}>
-                Dégâts
-              </th>
-              <th
-                scope="col"
-                title="Dégâts reçus par une carte adverse donnée : une part d'une attaque de zone, et chaque coup au hasard selon sa probabilité de la toucher"
-              >
-                Cible unique
-              </th>
-              <th scope="col" title={`Soins par tour en moyenne sur ${analysis.turns.length} tours, tout compris`}>
-                Soins
-              </th>
-              <th scope="col" title="Éléments générés par tour, en moyenne">
-                Gén.
-              </th>
-              <th scope="col" title="Éléments consommés par tour (coûts)">
-                Cons.
-              </th>
-              <th scope="col" title="Éléments obtenus en début de partie">
-                Départ
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {elementIds.map((id) => {
-              const element = catalog.elements.get(id);
-              return (
-                <tr key={id} data-weak={weak.has(id) ? '' : undefined}>
-                  <th scope="row">
-                    {element && <img src={assetUrl(element.icon)} alt="" />}
-                    {element?.name ?? id}
-                  </th>
-                  <td title={weak.has(id) ? 'Faiblesse : résistance moyenne la plus basse' : undefined}>
-                    {cell(analysis.averageResistances, id)}
-                    {analysis.averageResistances[id] !== undefined && ' %'}
-                  </td>
-                  <td>{cell(analysis.damagePerTurn, id)}</td>
-                  <td>{cell(analysis.singleTargetDamagePerTurn, id)}</td>
-                  <td>{cell(analysis.healPerTurn, id)}</td>
-                  <td>{cell(analysis.generatedPerTurn, id)}</td>
-                  <td>{cell(analysis.consumedPerTurn, id)}</td>
-                  <td>{cell(analysis.startingBonus, id)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {analysis.weaknesses.length > 0 && (
-        <p className="deck-analysis__weakness">
-          Faiblesse :{' '}
-          {analysis.weaknesses.map((id) => catalog.elements.get(id)?.name ?? id).join(', ')} (
-          {number.format(analysis.averageResistances[analysis.weaknesses[0] ?? ''] ?? 0)} % en moyenne)
-        </p>
-      )}
-
-      <h4>Par carte</h4>
-      <ul className="deck-analysis__cards">
-        {analysis.cards.map((card) => (
-          <li key={card.cardId}>
-            <div className="deck-analysis__card-line">
-              <span>
-                {card.cardName}
-                {card.isDps && <span className="deck-analysis__dps"> DPS</span>}{' '}
-                <span className="deck-analysis__muted">· {card.talentName}</span>
-              </span>
-              <span>
-                {number.format(card.damagePerTurn)} dégâts
-                {card.singleTargetDamagePerTurn !== card.damagePerTurn && (
-                  <span className="deck-analysis__muted" title="Dégâts reçus par une carte adverse donnée">
-                    {' '}
-                    ({number.format(card.singleTargetDamagePerTurn)} cible unique)
-                  </span>
-                )}
-                {card.healPerTurn > 0 && <> · {number.format(card.healPerTurn)} soins</>} ·{' '}
-                {number.format(card.generatedPerTurn)} éléments / tour
-              </span>
-            </div>
-            <BoostsLine boosts={card.finalBoosts} turn={last?.turn ?? 0} />
-          </li>
-        ))}
-      </ul>
-
       <h4>
-        Tour par tour
+        Dégâts par tour
         <label className="deck-analysis__turns">
           sur
           <input
@@ -182,48 +100,131 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
           tours
         </label>
       </h4>
-      <p className="deck-analysis__muted">
-        Chaque point de bonus d'un élément ajoute 10 % aux dégâts et soins de cet élément. Le stock gagne les éléments
-        générés (dès le tour où ils le sont) et perd ceux consommés.
-      </p>
-      <div className="deck-analysis__scroll">
-        <table className="deck-analysis__table deck-analysis__table--turns">
-          <thead>
-            <tr>
-              <th scope="col">Tour</th>
-              <th scope="col">Dégâts</th>
-              <th scope="col" title="Dégâts reçus par une carte adverse donnée">
-                Cible unique
-              </th>
-              <th scope="col">Soins</th>
-              <th scope="col">Stock de bonus</th>
-            </tr>
-          </thead>
-          <tbody>
-            {analysis.turns.map((turn) => (
-              <tr key={turn.turn}>
-                <th scope="row">{turn.turn}</th>
-                <td>{number.format(turn.totalDamage)}</td>
-                <td>{number.format(turn.totalSingleTargetDamage)}</td>
-                <td>{turn.totalHeal > 0 ? number.format(turn.totalHeal) : '–'}</td>
-                <td className="deck-analysis__stock">
-                  {elementIds
-                    .filter((id) => (turn.bonusStock[id] ?? 0) > 0)
-                    .map((id) => {
-                      const element = catalog.elements.get(id);
-                      return (
-                        <span key={id} title={element?.name}>
-                          {element && <img src={assetUrl(element.icon)} alt={element.name} />}
-                          {number.format(turn.bonusStock[id] ?? 0)}
-                        </span>
-                      );
-                    })}
-                </td>
-              </tr>
+      <LineChart
+        xs={xs}
+        xLabel={turnLabel}
+        format={formatAxis}
+        series={[
+          { ...TOTAL, values: along((turn) => turn.totalDamage) },
+          { ...SINGLE, values: along((turn) => turn.totalSingleTargetDamage) },
+        ]}
+      />
+      {hasHeal && (
+        <>
+          <h4>Soins par tour</h4>
+          <LineChart
+            xs={xs}
+            xLabel={turnLabel}
+            format={formatAxis}
+            height={130}
+            series={[
+              { key: 'heal', label: 'Soins', color: 'var(--chart-series-1)', values: along((turn) => turn.totalHeal) },
+            ]}
+          />
+        </>
+      )}
+
+      <h4>Dégâts moyens par élément</h4>
+      <BarChart
+        categories={elements.filter((element) => amount(analysis.damagePerTurn, element.key) > 0)}
+        series={[TOTAL, SINGLE]}
+        value={(id, series) =>
+          amount(series === 'total' ? analysis.damagePerTurn : analysis.singleTargetDamagePerTurn, id)
+        }
+        format={formatValue}
+      />
+
+      <h4>Résistances moyennes</h4>
+      <BarChart
+        categories={elements.filter((element) => analysis.averageResistances[element.key] !== undefined)}
+        series={[{ key: 'resistance', label: 'Résistance moyenne', color: 'var(--chart-series-1)' }]}
+        value={(id) => amount(analysis.averageResistances, id)}
+        format={formatPercent}
+        emphasis={(id) => weak.has(id)}
+        emphasisLabel="faiblesse"
+      />
+
+      <h4>Éléments par tour</h4>
+      <BarChart
+        categories={elements.filter(
+          (element) =>
+            amount(analysis.generatedPerTurn, element.key) > 0 || amount(analysis.consumedPerTurn, element.key) > 0,
+        )}
+        series={
+          hasConsumption
+            ? [
+                { key: 'generated', label: 'Générés', color: 'var(--chart-series-1)' },
+                { key: 'consumed', label: 'Consommés', color: 'var(--chart-series-2)' },
+              ]
+            : [{ key: 'generated', label: 'Générés', color: 'var(--chart-series-1)' }]
+        }
+        value={(id, series) =>
+          amount(series === 'generated' ? analysis.generatedPerTurn : analysis.consumedPerTurn, id)
+        }
+        format={formatValue}
+      />
+
+      {stockElements.length > 0 && (
+        <>
+          <h4>Stock de bonus par élément</h4>
+          <p className="deck-analysis__muted">
+            +10 % de dégâts et de soins de l'élément par point. Même échelle pour tous les éléments.
+          </p>
+          <div className="chart-multiples">
+            {stockElements.map((element) => (
+              <LineChart
+                key={element.key}
+                compact
+                height={70}
+                maxY={stockMax}
+                xs={xs}
+                xLabel={turnLabel}
+                format={formatValue}
+                series={[
+                  {
+                    key: element.key,
+                    label: element.label,
+                    color: 'var(--chart-series-1)',
+                    values: along((turn) => turn.bonusStock[element.key] ?? 0),
+                  },
+                ]}
+                title={
+                  <p className="chart-multiples__title">
+                    {element.icon && <img src={element.icon} alt="" />}
+                    {element.label}
+                    <span>{number.format(last?.bonusStock[element.key] ?? 0)}</span>
+                  </p>
+                }
+              />
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </>
+      )}
+
+      <h4>Par carte</h4>
+      <BarChart
+        categories={analysis.cards.map((card) => ({
+          key: card.cardId,
+          label: card.isDps ? `${card.cardName} (DPS)` : card.cardName,
+        }))}
+        labelWidth={150}
+        series={[TOTAL, SINGLE]}
+        value={(id, series) => {
+          const card = analysis.cards.find((candidate) => candidate.cardId === id);
+          return (series === 'total' ? card?.damagePerTurn : card?.singleTargetDamagePerTurn) ?? 0;
+        }}
+        format={formatValue}
+      />
+      <ul className="deck-analysis__cards">
+        {analysis.cards.map((card) => (
+          <li key={card.cardId}>
+            <span>
+              {card.cardName} <span className="deck-analysis__muted">· {card.talentName ?? 'aucun talent'}</span>
+            </span>
+            <BoostsLine boosts={card.finalBoosts} turn={last?.turn ?? 0} />
+          </li>
+        ))}
+      </ul>
 
       {analysis.unquantified.length > 0 && (
         <>
@@ -237,7 +238,81 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
           </ul>
         </>
       )}
+
+      <details className="deck-analysis__data">
+        <summary>Voir les données</summary>
+        <DataTables analysis={analysis} elements={elements} />
+      </details>
     </section>
+  );
+}
+
+/** Vue tableau des mêmes données (accessibilité, lecture précise). */
+function DataTables({ analysis, elements }: { analysis: DeckAnalysis; elements: readonly ChartCategory[] }) {
+  const cell = (amounts: ElementAmounts, id: string) => {
+    const value = amounts[id];
+    return value === undefined || value === 0 ? '–' : number.format(value);
+  };
+  const resistance = (id: string) => {
+    const value = analysis.averageResistances[id];
+    return value === undefined ? '–' : formatPercent(value);
+  };
+  return (
+    <div className="deck-analysis__scroll">
+      <table className="deck-analysis__table">
+        <caption>Par élément (moyennes par tour)</caption>
+        <thead>
+          <tr>
+            <th scope="col">Élément</th>
+            <th scope="col">Rés.</th>
+            <th scope="col">Dégâts</th>
+            <th scope="col">Cible unique</th>
+            <th scope="col">Soins</th>
+            <th scope="col">Gén.</th>
+            <th scope="col">Cons.</th>
+            <th scope="col">Départ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {elements.map((element) => (
+            <tr key={element.key} data-weak={analysis.weaknesses.includes(element.key) ? '' : undefined}>
+              <th scope="row">
+                {element.icon && <img src={element.icon} alt="" />}
+                {element.label}
+              </th>
+              <td>{resistance(element.key)}</td>
+              <td>{cell(analysis.damagePerTurn, element.key)}</td>
+              <td>{cell(analysis.singleTargetDamagePerTurn, element.key)}</td>
+              <td>{cell(analysis.healPerTurn, element.key)}</td>
+              <td>{cell(analysis.generatedPerTurn, element.key)}</td>
+              <td>{cell(analysis.consumedPerTurn, element.key)}</td>
+              <td>{cell(analysis.startingBonus, element.key)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <table className="deck-analysis__table deck-analysis__table--turns">
+        <caption>Tour par tour</caption>
+        <thead>
+          <tr>
+            <th scope="col">Tour</th>
+            <th scope="col">Dégâts</th>
+            <th scope="col">Cible unique</th>
+            <th scope="col">Soins</th>
+          </tr>
+        </thead>
+        <tbody>
+          {analysis.turns.map((turn) => (
+            <tr key={turn.turn}>
+              <th scope="row">{turn.turn}</th>
+              <td>{number.format(turn.totalDamage)}</td>
+              <td>{number.format(turn.totalSingleTargetDamage)}</td>
+              <td>{turn.totalHeal > 0 ? number.format(turn.totalHeal) : '–'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -260,4 +335,3 @@ function BoostsLine({ boosts, turn }: { boosts: DeckAnalysis['cards'][number]['f
     </p>
   );
 }
-

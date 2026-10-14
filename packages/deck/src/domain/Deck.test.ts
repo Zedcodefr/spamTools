@@ -5,12 +5,21 @@ import { analyzeDeck, type AbilityModel, type Boost, type DeckCardStats, type St
 import { Deck } from './Deck.js';
 
 const NOW = new Date('2026-10-14T12:00:00Z');
-const content = (slots: { cardId: string; talentSlot: number }[]) => ({ name: 'Feu', version: '1.21', language: 'fr', slots });
+const content = (slots: { cardId: string; talentSlot: number | null }[]) => ({
+  name: 'Feu',
+  version: '1.21',
+  language: 'fr',
+  slots,
+});
 
 describe('Deck', () => {
   it('accepte jusqu’à 4 cartes distinctes avec un talent chacune', () => {
     const deck = Deck.create(content([1, 2, 3, 4].map((n) => ({ cardId: `c${n}`, talentSlot: 1 }))), NOW);
     assert.equal(deck.slots.length, 4);
+  });
+
+  it('accepte une carte sans talent', () => {
+    assert.equal(Deck.create(content([{ cardId: 'c1', talentSlot: null }]), NOW).slots[0]?.talentSlot, null);
   });
 
   it('refuse plus de 4 cartes, un doublon, un talent invalide ou un nom vide', () => {

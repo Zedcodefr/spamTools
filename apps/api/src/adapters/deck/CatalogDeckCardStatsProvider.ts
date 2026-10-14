@@ -1,5 +1,5 @@
 import { CatalogVersion, NotFoundError, type CatalogRepository } from '@spamtools/card-catalog';
-import type { DeckCardStats, DeckCardStatsProvider, DeckSlot } from '@spamtools/deck';
+import { NO_CONTRIBUTION, type DeckCardStats, type DeckCardStatsProvider, type DeckSlot } from '@spamtools/deck';
 
 /**
  * Adaptateur : relie le port du package deck au catalogue des cartes. Les statistiques
@@ -19,19 +19,16 @@ export class CatalogDeckCardStatsProvider implements DeckCardStatsProvider {
         throw new NotFoundError(`Carte introuvable en ${version} : ${slot.cardId}`);
       }
       const { stats } = catalog.traitsOf(card);
+      const base = { cardId: slot.cardId, cardName: card.name, base: stats.base, bonusFactor: stats.bonusFactor };
+      if (slot.talentSlot === null) {
+        return { ...base, talentName: null, talent: NO_CONTRIBUTION };
+      }
       const talentStats = stats.talents[String(slot.talentSlot)];
       const talent = card.data.talents.find((candidate) => candidate.slot === slot.talentSlot);
       if (talentStats === undefined || talent === undefined) {
         throw new NotFoundError(`Talent ${slot.talentSlot} introuvable pour la carte "${card.name}"`);
       }
-      return {
-        cardId: slot.cardId,
-        cardName: card.name,
-        talentName: talent.name,
-        base: stats.base,
-        talent: talentStats,
-        bonusFactor: stats.bonusFactor,
-      };
+      return { ...base, talentName: talent.name, talent: talentStats };
     });
   }
 }

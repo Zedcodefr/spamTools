@@ -3,10 +3,10 @@ import { DeckId } from './DeckId.js';
 
 export const DECK_SIZE = 4;
 
-/** Une carte du deck et le talent choisi pour elle (emplacement 1, 2 ou 3). */
+/** Une carte du deck et le talent choisi pour elle (emplacement 1, 2 ou 3), ou aucun talent. */
 export interface DeckSlot {
   readonly cardId: string;
-  readonly talentSlot: number;
+  readonly talentSlot: number | null;
 }
 
 export interface DeckContent {
@@ -20,7 +20,7 @@ export interface DeckContent {
 }
 
 /**
- * Agrégat : un deck de 4 cartes au plus, chacune avec un talent, sans doublon.
+ * Agrégat : un deck de 4 cartes au plus, sans doublon, chacune avec au plus un talent.
  */
 export class Deck extends AggregateRoot<DeckId> {
   private constructor(
@@ -83,7 +83,7 @@ export class Deck extends AggregateRoot<DeckId> {
       throw new DomainError('Une carte ne peut figurer qu’une fois dans un deck');
     }
     for (const slot of content.slots) {
-      if (!Number.isInteger(slot.talentSlot) || slot.talentSlot < 1) {
+      if (slot.talentSlot !== null && (!Number.isInteger(slot.talentSlot) || slot.talentSlot < 1)) {
         throw new DomainError(`Talent invalide pour la carte ${slot.cardId} : ${slot.talentSlot}`);
       }
     }

@@ -2,10 +2,10 @@
 
 export const DECK_SIZE = 4;
 
-/** Une carte du deck et le talent choisi pour elle (emplacement 1, 2 ou 3). */
+/** Une carte du deck et le talent choisi pour elle (emplacement 1, 2 ou 3), ou aucun talent. */
 export interface DeckSlot {
   readonly cardId: string;
-  readonly talentSlot: number;
+  readonly talentSlot: number | null;
 }
 
 export interface DeckView {
@@ -30,9 +30,10 @@ export interface DeckDraft {
 
 export const EMPTY_DRAFT: DeckDraft = { id: null, name: '', slots: [], dpsCardId: null };
 
-export const DEFAULT_TALENT_SLOT = 1;
+/** Une carte ajoutée au deck commence sans talent. */
+export const DEFAULT_TALENT_SLOT = null;
 
-/** Ajoute la carte (talent 1 par défaut) si le deck n'est pas plein, ou la retire si elle y est déjà. */
+/** Ajoute la carte (sans talent) si le deck n'est pas plein, ou la retire si elle y est déjà. */
 export function toggleCard(draft: DeckDraft, cardId: string): DeckDraft {
   if (draft.slots.some((slot) => slot.cardId === cardId)) {
     return removeCard(draft, cardId);
@@ -59,7 +60,7 @@ export function toggleDps(draft: DeckDraft, cardId: string): DeckDraft {
   return { ...draft, dpsCardId: draft.dpsCardId === cardId ? null : cardId };
 }
 
-export function setTalent(draft: DeckDraft, cardId: string, talentSlot: number): DeckDraft {
+export function setTalent(draft: DeckDraft, cardId: string, talentSlot: number | null): DeckDraft {
   return {
     ...draft,
     slots: draft.slots.map((slot) => (slot.cardId === cardId ? { ...slot, talentSlot } : slot)),
@@ -114,7 +115,7 @@ export interface DeckAnalysis {
   readonly cards: readonly {
     readonly cardId: string;
     readonly cardName: string;
-    readonly talentName: string;
+    readonly talentName: string | null;
     readonly isDps: boolean;
     readonly resistances: ElementAmounts;
     readonly damagePerTurn: number;

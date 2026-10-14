@@ -111,7 +111,7 @@ et images dans `assets/`), ou dans le dossier indiqué par `SPAMTOOLS_DATA_DIR`.
 ## Deck builder (`/deck`)
 
 Clic gauche sur une carte de la galerie : l'ajouter au deck (4 cartes, sans doublon) ou l'en retirer ;
-un talent par carte, et un **DPS** facultatif. L'analyse **simule la partie tour par tour, en espérance**,
+au plus un talent par carte (aucun par défaut), et un **DPS** facultatif. L'analyse **simule la partie tour par tour, en espérance**,
 les 4 cartes agissant à chaque tour :
 
 - capacité de recharge N : utilisée une fois tous les N tours (Écho : chance de rester disponible) ;
@@ -127,6 +127,10 @@ les 4 cartes agissant à chaque tour :
   les alliées, au **DPS choisi** (renforts ciblés ; non comptés sans DPS) ou ¼ à chaque alliée (« au hasard ») ;
   précision et critique plafonnées à 100 % ; talents « à chaque tour » appliqués à chaque tour ;
 - résistances moyennes des 4 cartes, talents permanents et bonus d'équipe compris ; faiblesse = la plus basse.
+
+Résultats en graphiques (SVG maison, couleurs validées pour les daltonismes contre le fond de l'app),
+les courbes partant de 0 (« Départ », avant l'application des talents) ; les données restent consultables
+en tableaux (« Voir les données »).
 
 Les effets conditionnels, à usage limité ou en pourcentage de PV sont listés « non chiffrés ».
 Le modèle de chaque capacité est calculé à l'import (`computeCardStats`) ; l'analyse (`analyzeDeck`) simule.

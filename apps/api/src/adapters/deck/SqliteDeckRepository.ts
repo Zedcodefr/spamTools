@@ -50,7 +50,10 @@ export class SqliteDeckRepository implements DeckRepository {
     const slots = this.database.connection
       .prepare('SELECT card_id, talent_slot FROM deck_slot WHERE deck_id = ? ORDER BY position')
       .all(id)
-      .map((slot) => ({ cardId: String(slot['card_id']), talentSlot: Number(slot['talent_slot']) }));
+      .map((slot) => ({
+        cardId: String(slot['card_id']),
+        talentSlot: slot['talent_slot'] === null ? null : Number(slot['talent_slot']),
+      }));
     return Deck.restore(
       new DeckId(id),
       {

@@ -5,9 +5,9 @@ import { EMPTY_DRAFT, isFull, removeCard, setTalent, toggleCard, toggleDps } fro
 const ids = (draft: typeof EMPTY_DRAFT) => draft.slots.map((slot) => slot.cardId);
 
 describe('composition de deck', () => {
-  it('ajoute une carte avec le talent 1, et la retire au second clic', () => {
+  it('ajoute une carte sans talent, et la retire au second clic', () => {
     const draft = toggleCard(EMPTY_DRAFT, 'a');
-    assert.deepEqual(draft.slots, [{ cardId: 'a', talentSlot: 1 }]);
+    assert.deepEqual(draft.slots, [{ cardId: 'a', talentSlot: null }]);
     assert.deepEqual(ids(toggleCard(draft, 'a')), []);
   });
 
@@ -28,6 +28,7 @@ describe('composition de deck', () => {
   it('change le talent ou retire une carte précise', () => {
     const draft = ['a', 'b'].reduce(toggleCard, EMPTY_DRAFT);
     assert.deepEqual(setTalent(draft, 'b', 3).slots[1], { cardId: 'b', talentSlot: 3 });
+    assert.deepEqual(setTalent(setTalent(draft, 'b', 3), 'b', null).slots[1], { cardId: 'b', talentSlot: null });
     assert.deepEqual(ids(removeCard(draft, 'a')), ['b']);
   });
 });

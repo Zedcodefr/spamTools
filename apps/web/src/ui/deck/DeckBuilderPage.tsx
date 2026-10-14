@@ -176,9 +176,12 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
                   <label>
                     Talent
                     <select
-                      value={slot.talentSlot}
-                      onChange={(event) => setDraft(setTalent(draft, card.id, Number(event.target.value)))}
+                      value={slot.talentSlot ?? ''}
+                      onChange={(event) =>
+                        setDraft(setTalent(draft, card.id, event.target.value === '' ? null : Number(event.target.value)))
+                      }
                     >
+                      <option value="">Aucun talent</option>
                       {[...card.talents]
                         .sort((a, b) => a.slot - b.slot)
                         .map((candidate) => (

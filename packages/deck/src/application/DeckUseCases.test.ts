@@ -22,7 +22,7 @@ const empty: StatContribution = {
 const provider: DeckCardStatsProvider = {
   async statsFor(_version: string, _language: string, slots: readonly DeckSlot[]): Promise<DeckCardStats[]> {
     return slots.map((slot) => {
-      if (!/^c[1-5]$/.test(slot.cardId) || slot.talentSlot > 3) {
+      if (!/^c[1-5]$/.test(slot.cardId) || (slot.talentSlot ?? 0) > 3) {
         throw new NotFoundError(`Carte ou talent introuvable : ${slot.cardId}/${slot.talentSlot}`);
       }
       const talent = { ...empty, resistances: {}, abilities: [] };

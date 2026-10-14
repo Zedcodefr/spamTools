@@ -259,4 +259,23 @@ export const migrations: readonly SqlMigration[] = [
       UPDATE catalog SET analysis_version = NULL;
     `,
   },
+  {
+    version: 7,
+    name: 'optional_deck_talent',
+    sql: `
+      -- Une carte du deck peut n'avoir aucun talent : talent_slot devient facultatif.
+      -- SQLite ne modifie pas une contrainte NOT NULL : la table est recréée, données conservées.
+      CREATE TABLE deck_slot_new (
+        deck_id      TEXT NOT NULL REFERENCES deck (id) ON DELETE CASCADE,
+        position     INTEGER NOT NULL,
+        card_id      TEXT NOT NULL,
+        talent_slot  INTEGER,
+        PRIMARY KEY (deck_id, position),
+        UNIQUE (deck_id, card_id)
+      );
+      INSERT INTO deck_slot_new SELECT deck_id, position, card_id, talent_slot FROM deck_slot;
+      DROP TABLE deck_slot;
+      ALTER TABLE deck_slot_new RENAME TO deck_slot;
+    `,
+  },
 ];

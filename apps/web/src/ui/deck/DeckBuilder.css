@@ -266,3 +266,19 @@
     max-height: none;
   }
 }
+
+.deck-analysis__data {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.deck-analysis__data summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.deck-analysis__table caption {
+  margin: 0.75rem 0 0.25rem;
+  text-align: left;
+  color: var(--text-muted);
+}

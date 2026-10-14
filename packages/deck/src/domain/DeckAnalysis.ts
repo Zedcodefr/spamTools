@@ -63,11 +63,23 @@ export interface StatContribution {
   readonly unquantified: readonly { readonly source: string; readonly reason: string }[];
 }
 
-/** Une carte du deck : son modèle et celui du talent choisi. */
+/** Apport nul : carte sans talent. */
+export const NO_CONTRIBUTION: StatContribution = {
+  resistances: {},
+  allyResistances: {},
+  abilities: [],
+  passiveBonusPerTurn: {},
+  startingBonus: {},
+  startingBoosts: [],
+  boostsPerTurn: [],
+  unquantified: [],
+};
+
+/** Une carte du deck : son modèle et celui du talent choisi (NO_CONTRIBUTION sans talent). */
 export interface DeckCardStats {
   readonly cardId: string;
   readonly cardName: string;
-  readonly talentName: string;
+  readonly talentName: string | null;
   readonly base: StatContribution;
   readonly talent: StatContribution;
   /** Coefficient appliqué aux bonus pour cette carte (2 avec Multiplicateur). */
@@ -105,7 +117,7 @@ export interface TurnProjection {
 export interface DeckCardSummary {
   readonly cardId: string;
   readonly cardName: string;
-  readonly talentName: string;
+  readonly talentName: string | null;
   readonly isDps: boolean;
   readonly resistances: ElementAmounts;
   /** Moyennes par tour sur la simulation : dégâts totaux, et reçus par une carte adverse donnée. */
@@ -190,7 +202,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
   };
   cards.forEach((card, index) => {
     for (const boost of [...card.base.startingBoosts, ...card.talent.startingBoosts]) {
-      applyBoost(index, boost, 1, card.talentName);
+      applyBoost(index, boost, 1, card.talentName ?? card.cardName);
     }
   });
 
@@ -209,7 +221,7 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
     // 1. Renforts du tour.
     cards.forEach((card, index) => {
       for (const boost of [...card.base.boostsPerTurn, ...card.talent.boostsPerTurn]) {
-        applyBoost(index, boost, 1, card.talentName);
+        applyBoost(index, boost, 1, card.talentName ?? card.cardName);
       }
       abilities[index]?.forEach((ability) => {
         for (const boost of ability.boosts) {
