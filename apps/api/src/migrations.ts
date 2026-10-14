@@ -207,4 +207,21 @@ export const migrations: readonly SqlMigration[] = [
       UPDATE catalog SET analysis_version = NULL;
     `,
   },
+  {
+    version: 4,
+    name: 'add_card_stats',
+    sql: `
+      -- Statistiques chiffrées par carte et par talent (dégâts, éléments générés, résistances...),
+      -- calculées à l'import pour l'analyse des decks. Document JSON (voir CardStats).
+      CREATE TABLE card_stats (
+        version   TEXT NOT NULL,
+        language  TEXT NOT NULL,
+        card_id   TEXT NOT NULL,
+        stats     TEXT NOT NULL,
+        PRIMARY KEY (version, language, card_id),
+        FOREIGN KEY (version, language, card_id) REFERENCES card (version, language, id) ON DELETE CASCADE
+      );
+      UPDATE catalog SET analysis_version = NULL;
+    `,
+  },
 ];

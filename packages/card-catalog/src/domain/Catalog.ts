@@ -62,7 +62,7 @@ export class Catalog extends AggregateRoot<CatalogId> {
     const upToDate = props.traits !== undefined && props.traits.analysisVersion === ANALYSIS_VERSION;
     const traits = upToDate
       ? (props.traits as CatalogTraits)
-      : analyzeTraits({ cards: cards.map((card) => card.data), keywords: props.keywords });
+      : analyzeTraits({ cards: cards.map((card) => card.data), elements: props.elements, keywords: props.keywords });
     const missing = cards.find((card) => traits.byCard[card.id.value] === undefined);
     if (missing !== undefined) {
       throw new DomainError(`Caractéristiques manquantes pour la carte "${missing.name}"`);

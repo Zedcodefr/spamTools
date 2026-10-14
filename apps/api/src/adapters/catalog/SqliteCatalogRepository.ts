@@ -7,6 +7,7 @@ import {
   ANALYSIS_VERSION,
   type CardAction,
   type CardData,
+  type CardStats,
   type CardTraits,
   type CatalogRepository,
   type CatalogTraits,
@@ -95,7 +96,9 @@ export class SqliteCatalogRepository implements CatalogRepository {
 
   async saveTraits(catalog: Catalog): Promise<void> {
     this.database.transaction((db) => {
-      db.prepare('DELETE FROM card_trait WHERE version = ? AND language = ?').run(catalog.version.value, catalog.language);
+      for (const table of ['card_trait', 'card_stats']) {
+        db.prepare(`DELETE FROM ${table} WHERE version = ? AND language = ?`).run(catalog.version.value, catalog.language);
+      }
       writeTraits(db, catalog);
     });
     this.cache.delete(`${catalog.version.value}/${catalog.language}`);
@@ -168,6 +171,7 @@ export class SqliteCatalogRepository implements CatalogRepository {
         catalogRow,
         cardRows.map((row) => text(row, 'id')),
         select('card_trait', 'card_id, kind, value'),
+        select('card_stats', 'card_id'),
       ),
       elements: select('element', 'sort_order').map((row) => ({
         id: text(row, 'id'),
@@ -289,6 +293,7 @@ function writeTraits(db: DatabaseSync, catalog: Catalog): void {
     for (const flag of TRAIT_FLAGS.filter((name) => cardTraits[name])) {
       insert(db, 'card_trait', { ...scope, kind: 'flag', value: flag });
     }
+    insert(db, 'card_stats', { ...scope, stats: JSON.stringify(cardTraits.stats) });
   }
 }
 
@@ -296,11 +301,18 @@ function writeTraits(db: DatabaseSync, catalog: Catalog): void {
  * Caractéristiques enregistrées, si elles ont été calculées avec les règles actuelles ;
  * sinon `undefined` : le catalogue les recalcule (en attendant la prochaine synchro).
  */
-function readTraits(catalogRow: Row, cardIds: readonly string[], rows: Row[]): CatalogTraits | undefined {
+function readTraits(
+  catalogRow: Row,
+  cardIds: readonly string[],
+  rows: Row[],
+  statsRows: Row[],
+): CatalogTraits | undefined {
   if (catalogRow['analysis_version'] !== ANALYSIS_VERSION || catalogRow['trait_definitions'] === null) {
     return undefined;
   }
-  type MutableTraits = { -readonly [K in keyof CardTraits]: CardTraits[K] extends readonly string[] ? string[] : boolean };
+  type MutableTraits = {
+    -readonly [K in keyof Omit<CardTraits, 'stats'>]: CardTraits[K] extends readonly string[] ? string[] : boolean;
+  };
   // Toutes les cartes, y compris celles sans aucune caractéristique (aucune ligne).
   const byCard: Record<string, MutableTraits> = Object.fromEntries(
     cardIds.map((id) => [
@@ -330,8 +342,18 @@ function readTraits(catalogRow: Row, cardIds: readonly string[], rows: Row[]): C
       traits[TRAIT_KINDS[kind as keyof typeof TRAIT_KINDS]].push(text(row, 'value'));
     }
   }
+  const stats = new Map(statsRows.map((row) => [text(row, 'card_id'), json<CardStats>(row, 'stats')]));
+  if (cardIds.some((id) => !stats.has(id))) {
+    return undefined;
+  }
   const definitions = json<Pick<CatalogTraits, 'categories' | 'specialAbilities'>>(catalogRow, 'trait_definitions');
-  return { analysisVersion: ANALYSIS_VERSION, ...definitions, byCard };
+  return {
+    analysisVersion: ANALYSIS_VERSION,
+    ...definitions,
+    byCard: Object.fromEntries(
+      Object.entries(byCard).map(([id, traits]) => [id, { ...traits, stats: stats.get(id) as CardStats }]),
+    ),
+  };
 }
 
 function insertCard(db: DatabaseSync, scope: { version: string; language: string }, card: CardData): void {

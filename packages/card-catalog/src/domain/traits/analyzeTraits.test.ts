@@ -103,7 +103,7 @@ const cards = [
   }),
 ];
 
-const traits = analyzeTraits({ cards, keywords });
+const traits = analyzeTraits({ cards, elements: [], keywords });
 const of = (id: string) => traits.byCard[id];
 
 describe('analyzeTraits', () => {
@@ -163,7 +163,8 @@ describe('analyzeTraits', () => {
   });
 
   it('classe « Autres » une capacité inconnue de la taxonomie', () => {
-    const unknown = analyzeTraits({ cards: [card('x', { skills: [skill('Nouveau_C', 'Nouveauté')] })], keywords: [] });
+    const cards = [card('x', { skills: [skill('Nouveau_C', 'Nouveauté')] })];
+    const unknown = analyzeTraits({ cards, elements: [], keywords: [] });
     assert.equal(unknown.specialAbilities[0]?.category, 'other');
   });
 });

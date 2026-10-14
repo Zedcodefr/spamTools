@@ -1,6 +1,7 @@
 import type { Ability, CardAction, CardData } from '../Card.js';
-import type { Keyword } from '../References.js';
+import type { CardElement, Keyword } from '../References.js';
 import type { CardTraits, CatalogTraits, SpecialAbility, TraitIcon } from './CardTraits.js';
+import { computeCardStats, type StatsContext } from './computeCardStats.js';
 import {
   ANALYSIS_VERSION,
   DEFAULT_CATEGORY,
@@ -28,6 +29,7 @@ const IMMUNITY_MENTION = /insensibles? aux? [\p{L}']+/gu;
 
 export interface TraitAnalysisInput {
   readonly cards: readonly CardData[];
+  readonly elements: readonly CardElement[];
   readonly keywords: readonly Keyword[];
 }
 
@@ -35,11 +37,12 @@ export interface TraitAnalysisInput {
  * Calcule les caractéristiques de toutes les cartes d'un catalogue :
  * éléments de frappe, de bonus et de soin, capacités particulières et leurs catégories.
  */
-export function analyzeTraits({ cards, keywords }: TraitAnalysisInput): CatalogTraits {
+export function analyzeTraits({ cards, elements, keywords }: TraitAnalysisInput): CatalogTraits {
   const vocabulary = buildVocabulary(cards, keywords);
+  const statsContext = buildStatsContext(elements, vocabulary);
   const byCard: Record<string, CardTraits> = {};
   for (const card of cards) {
-    byCard[card.id] = analyzeCard(card, keywords, vocabulary);
+    byCard[card.id] = { ...analyzeCard(card, keywords, vocabulary), stats: computeCardStats(card, statsContext) };
   }
 
   const presentAbilities = new Set(Object.values(byCard).flatMap((traits) => traits.specialAbilities));
@@ -137,7 +140,23 @@ function buildVocabulary(cards: readonly CardData[], keywords: readonly Keyword[
   return { byKey, elementByKey, baseElements, passiveKeywordsByBaseId, mentions };
 }
 
-function analyzeCard(card: CardData, keywords: readonly Keyword[], vocabulary: Vocabulary): CardTraits {
+function buildStatsContext(elements: readonly CardElement[], vocabulary: Vocabulary): StatsContext {
+  return {
+    baseElements: [...vocabulary.baseElements],
+    elementIdByName: new Map(elements.map((element) => [normalize(element.name), element.id])),
+    grantedPassive: (talent) => {
+      const keyword =
+        talent.grantsSkill === null ? undefined : vocabulary.passiveKeywordsByBaseId.get(baseId(talent.grantsSkill));
+      return keyword === undefined
+        ? undefined
+        : { key: specialAbilityKey(keyword.title), label: keyword.title, description: keyword.description };
+    },
+    passiveElement: (key) => vocabulary.elementByKey.get(key),
+    keyOf: specialAbilityKey,
+  };
+}
+
+function analyzeCard(card: CardData, keywords: readonly Keyword[], vocabulary: Vocabulary): Omit<CardTraits, 'stats'> {
   const abilityActions = card.abilities.flatMap((ability) => ability.actions);
   const keywordsById = new Map(keywords.map((keyword) => [keyword.id, keyword]));
 

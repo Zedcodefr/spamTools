@@ -3,6 +3,8 @@
  * et conservées avec le catalogue pour filtrer sans recalcul.
  */
 
+import type { CardStats } from './CardStats.js';
+
 /** Icône : image officielle des données du jeu, ou symbole générique (nom d'icône Lucide). */
 export type TraitIcon = { readonly type: 'asset'; readonly path: string } | { readonly type: 'symbol'; readonly name: string };
 
@@ -39,6 +41,8 @@ export interface CardTraits {
   readonly specialAbilities: readonly string[];
   /** Catégories de ses capacités particulières. */
   readonly categories: readonly string[];
+  /** Statistiques chiffrées (dégâts, éléments générés, résistances...), pour l'analyse des decks. */
+  readonly stats: CardStats;
 }
 
 export interface CatalogTraits {
