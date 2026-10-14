@@ -55,7 +55,7 @@ pnpm install
 pnpm dev       # tsc en watch + API (port 3000) + Vite (http://localhost:5173)
 pnpm build     # build de tous les packages et apps
 pnpm typecheck
-pnpm --filter @spamtools/card-catalog test   # tests (node:test)
+pnpm test       # tests (node:test) de tous les packages
 ```
 
 ## Données des cartes

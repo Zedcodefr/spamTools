@@ -8,7 +8,8 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./infrastructure": { "types": "./dist/infrastructure/index.d.ts", "default": "./dist/infrastructure/index.js" }
+    "./infrastructure": { "types": "./dist/infrastructure/index.d.ts", "default": "./dist/infrastructure/index.js" },
+    "./testing": { "types": "./dist/test-support/spamGameFixtures.d.ts", "default": "./dist/test-support/spamGameFixtures.js" }
   },
   "scripts": {
     "build": "tsc -b",

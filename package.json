@@ -6,6 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "pnpm -r build",
+    "test": "pnpm -r test",
     "clean": "tsc -b --clean",
     "typecheck": "tsc -b --noEmit && pnpm --filter @spamtools/web typecheck",
     "dev": "pnpm build && concurrently -k -n tsc,api,web -c blue,green,magenta \"tsc -b -w --preserveWatchOutput\" \"pnpm --filter @spamtools/api dev\" \"pnpm --filter @spamtools/web dev\"",

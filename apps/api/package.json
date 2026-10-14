@@ -7,10 +7,12 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -b",
+    "test": "tsc -b && node --test \"dist/**/*.test.js\"",
     "start": "node dist/main.js",
     "dev": "node --watch dist/main.js"
   },
   "dependencies": {
+    "@spamtools/card-catalog": "workspace:*",
     "@spamtools/data-import": "workspace:*",
     "@spamtools/database": "workspace:*",
     "@spamtools/shared-kernel": "workspace:*",

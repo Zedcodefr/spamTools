@@ -11,7 +11,8 @@
     "./infrastructure": { "types": "./dist/infrastructure/index.d.ts", "default": "./dist/infrastructure/index.js" }
   },
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "test": "tsc -b && node --test \"dist/**/*.test.js\""
   },
   "dependencies": {
     "@spamtools/shared-kernel": "workspace:*"
