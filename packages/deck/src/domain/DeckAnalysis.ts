@@ -283,13 +283,15 @@ function simulate(
     const ready = schedules.map((list) => list.map((schedule) => schedule.readyChance()));
     const usedNow = (index: number, abilityIndex: number) => ready[index]?.[abilityIndex] ?? 0;
 
-    // 1. Renforts du tour.
+    // 1. Renforts du tour. La chance de toucher de chaque capacité se lit sur les renforts acquis au
+    // début du tour : le résultat ne dépend pas de l'ordre des cartes dans le deck.
+    const atTurnStart = boosts.map((cardBoosts) => ({ ...cardBoosts }));
     cards.forEach((card, index) => {
       for (const boost of [...card.base.boostsPerTurn, ...card.talent.boostsPerTurn]) {
         applyBoost(index, boost, 1, card.talentName ?? card.cardName);
       }
       abilities[index]?.forEach((ability, abilityIndex) => {
-        const landed = usedNow(index, abilityIndex) * hitChance(ability, boosts[index] as CardBoosts);
+        const landed = usedNow(index, abilityIndex) * hitChance(ability, atTurnStart[index] as CardBoosts);
         for (const boost of ability.boosts) {
           applyBoost(index, boost, landed, ability.name);
         }

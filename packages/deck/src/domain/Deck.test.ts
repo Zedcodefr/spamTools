@@ -158,6 +158,19 @@ describe('analyzeDeck : simulation', () => {
     assert.deepEqual(damageByTurn(cards, 2), [11, 12]);
   });
 
+  it('donne le même résultat quel que soit l’ordre des cartes', () => {
+    const precision: Boost = { stat: 'precision', amount: 30, target: 'allies', chance: 1 };
+    const cards = [
+      cardStats('a', { abilities: [ability({ damage: [line(20)], precision: 40, boosts: [precision] })] }),
+      cardStats('b', { abilities: [ability({ damage: [line(30, 'water')], precision: 50, boosts: [precision] })] }),
+      cardStats('c', { abilities: [ability({ bonus: [line(1, 'water')], precision: 60 })] }),
+    ];
+    const forward = analyzeDeck(cards, { turns: 5 });
+    const backward = analyzeDeck([...cards].reverse(), { turns: 5 });
+    assert.equal(backward.totalDamagePerTurn, forward.totalDamagePerTurn);
+    assert.deepEqual(backward.generatedPerTurn, forward.generatedPerTurn);
+  });
+
   it('ne génère un bonus « en cas de coup critique » qu’avec la chance de critique', () => {
     const critBonus = { ...line(2, 'water'), onCritOnly: true };
     const cards = [cardStats('a', { abilities: [ability({ bonus: [critBonus], critChance: 25 })] })];
