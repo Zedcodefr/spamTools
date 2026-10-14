@@ -125,4 +125,17 @@ export interface DeckAnalysis {
     readonly finalBoosts: CardBoosts;
   }[];
   readonly unquantified: readonly { readonly cardName: string; readonly source: string; readonly reason: string }[];
+  /**
+   * Borne haute si le deck a des bonus « par coup reçu » (Sac de frappe) : cartes concernées frappées
+   * à chaque tour. L'analyse principale suppose qu'elles ne le sont jamais. Nul sinon.
+   */
+  readonly whenAlwaysHit: {
+    readonly hitsPerTurn: number;
+    readonly totalDamagePerTurn: number;
+    readonly totalSingleTargetDamagePerTurn: number;
+    readonly totalHealPerTurn: number;
+    readonly damagePerTurn: ElementAmounts;
+    readonly generatedPerTurn: ElementAmounts;
+    readonly turns: readonly TurnProjection[];
+  } | null;
 }

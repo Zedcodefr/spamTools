@@ -97,6 +97,12 @@
   gap: 0.35rem;
 }
 
+.chart-legend__key--dashed {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed;
+}
+
 .chart-legend__note {
   color: var(--text-muted);
   font-style: italic;

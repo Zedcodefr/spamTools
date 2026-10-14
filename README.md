@@ -134,5 +134,8 @@ Résultats en graphiques (SVG maison, couleurs validées pour les daltonismes co
 dégâts et soins par tour en barres (ce tour précis) superposées à leur cumul en courbe, partant de 0
 (« Départ », avant l'application des talents) ; les données restent consultables en tableaux.
 
+Bonus « par coup reçu » (Sac de frappe : +1 dans l'élément de la carte) : fourchette entre « jamais frappé »
+(analyse principale) et « frappé une fois à chaque tour » (résumé, courbe en pointillés, colonne de données).
+
 Les effets conditionnels, à usage limité ou en pourcentage de PV sont listés « non chiffrés ».
 Le modèle de chaque capacité est calculé à l'import (`computeCardStats`) ; l'analyse (`analyzeDeck`) simule.

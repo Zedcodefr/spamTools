@@ -334,6 +334,11 @@ interface ComboChartProps {
   readonly xLabel: (x: number) => string;
   /** Une mesure : valeur à chaque abscisse (barre), et son cumul (courbe) calculé ici. */
   readonly series: readonly (ChartSeries & { readonly values: readonly number[] })[];
+  /**
+   * Scénario alternatif (borne haute) d'une mesure : son cumul en pointillés, même couleur.
+   * `of` : clé de la série de référence.
+   */
+  readonly upperBounds?: readonly { readonly of: string; readonly label: string; readonly values: readonly number[] }[];
   readonly format: Format;
   readonly height?: number;
 }
@@ -343,18 +348,26 @@ interface ComboChartProps {
  * (ce tour précis), la courbe son cumul depuis le départ (0). Une couleur par mesure, partagée
  * par sa barre et sa courbe ; survol d'une abscisse entière.
  */
-export function ComboChart({ xs, xLabel, series, format, height = 200 }: ComboChartProps) {
+export function ComboChart({ xs, xLabel, series, upperBounds = [], format, height = 200 }: ComboChartProps) {
   const [hover, setHover] = useState<number | null>(null);
   const padding = { left: 36, right: VALUE_GUTTER + 4, top: 12, bottom: 22 };
   const plotWidth = WIDTH - padding.left - padding.right;
   const step = plotWidth / Math.max(1, xs.length - 1);
   const gap = 2;
   const barWidth = Math.max(2, Math.min(10, (step * 0.7 - gap * (series.length - 1)) / series.length));
-  const cumulative = series.map((entry) => {
+  const accumulate = (values: readonly number[]) => {
     let total = 0;
-    return entry.values.map((value) => (total += value));
-  });
-  const yMax = niceCeil(Math.max(1, ...cumulative.flat(), ...series.flatMap((entry) => entry.values)));
+    return values.map((value) => (total += value));
+  };
+  const cumulative = series.map((entry) => accumulate(entry.values));
+  const upper = upperBounds.map((bound) => ({
+    ...bound,
+    color: series.find((entry) => entry.key === bound.of)?.color ?? 'var(--chart-muted)',
+    cumulative: accumulate(bound.values),
+  }));
+  const yMax = niceCeil(
+    Math.max(1, ...cumulative.flat(), ...upper.flatMap((bound) => bound.cumulative), ...series.flatMap((entry) => entry.values)),
+  );
   const xOf = (index: number) => padding.left + index * step;
   const yOf = (y: number) => padding.top + (1 - y / yMax) * (height - padding.top - padding.bottom);
   const baseline = yOf(0);
@@ -367,6 +380,12 @@ export function ComboChart({ xs, xLabel, series, format, height = 200 }: ComboCh
             <span className="chart-legend__key chart-legend__key--bar" style={{ background: entry.color }} />
             <span className="chart-legend__key chart-legend__key--line" style={{ background: entry.color }} />
             {entry.label}
+          </li>
+        ))}
+        {upper.map((bound) => (
+          <li key={bound.label}>
+            <span className="chart-legend__key chart-legend__key--dashed" style={{ borderColor: bound.color }} />
+            {bound.label}
           </li>
         ))}
         <li className="chart-legend__note">barre : ce tour · courbe : cumul</li>
@@ -436,6 +455,21 @@ export function ComboChart({ xs, xLabel, series, format, height = 200 }: ComboCh
               </g>
             );
           })}
+          {upper.map((bound) => (
+            <g key={bound.label}>
+              <polyline
+                points={bound.cumulative.map((value, index) => `${xOf(index)},${yOf(value)}`).join(' ')}
+                fill="none"
+                stroke={bound.color}
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                strokeLinecap="round"
+              />
+              <text className="chart__value" x={xOf(xs.length - 1) + 6} y={yOf(bound.cumulative.at(-1) ?? 0) + 3}>
+                {format(bound.cumulative.at(-1) ?? 0)}
+              </text>
+            </g>
+          ))}
           {series.map((entry, position) => {
             const values = cumulative[position] ?? [];
             const points = values.map((value, index) => `${xOf(index)},${yOf(value)}`).join(' ');
@@ -472,14 +506,20 @@ export function ComboChart({ xs, xLabel, series, format, height = 200 }: ComboCh
               x: Math.min(Math.max(xOf(hover), 80), WIDTH - 80),
               y: 4,
               title: xLabel(xs[hover] ?? 0),
-              rows: series.flatMap((entry, position) => [
-                { label: `${entry.label} ce tour`, value: format(entry.values[hover] ?? 0), color: entry.color },
-                {
-                  label: `${entry.label} cumulés`,
-                  value: format(cumulative[position]?.[hover] ?? 0),
-                  color: entry.color,
-                },
-              ]),
+              rows: [
+                ...series.flatMap((entry, position) => [
+                  { label: `${entry.label} ce tour`, value: format(entry.values[hover] ?? 0), color: entry.color },
+                  {
+                    label: `${entry.label} cumulés`,
+                    value: format(cumulative[position]?.[hover] ?? 0),
+                    color: entry.color,
+                  },
+                ]),
+                ...upper.flatMap((bound) => [
+                  { label: `${bound.label} ce tour`, value: format(bound.values[hover] ?? 0), color: bound.color },
+                  { label: `${bound.label} cumulés`, value: format(bound.cumulative[hover] ?? 0), color: bound.color },
+                ]),
+              ],
             }}
           />
         )}

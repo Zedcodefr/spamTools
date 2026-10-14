@@ -165,13 +165,15 @@ describe('computeCardStats', () => {
     assert.deepEqual(base.unquantified.map((note) => note.source), ['Valse', 'Ratio']);
   });
 
-  it('compte les Cœurs portés en tox, signale le Sac de frappe, double les bonus avec Multiplicateur', () => {
+  it('compte les Cœurs portés en tox, le Sac de frappe par coup reçu, double les bonus avec Multiplicateur', () => {
     const skill = (id: string, name: string, value: number) => ({
       id, name, effect: '', effectRich: '', rarity: 'rare', element: name === 'Cœur de feu' ? 'fire' : null, value, icon: null,
     });
     const withSkills = stats({ skills: [skill('CoeurFeu_R', 'Cœur de feu', 2), skill('PunchingBag_C', 'Sac de frappe', 1)] });
     assert.deepEqual(withSkills.base.passiveBonusPerTurn, { fire: 2 });
-    assert.deepEqual(withSkills.base.unquantified.map((note) => note.source), ['Sac de frappe']);
+    // Sac de frappe : +1 dans l'élément de la carte (nature) à chaque attaque subie.
+    assert.deepEqual(withSkills.base.bonusPerHit, { nature: 1 });
+    assert.deepEqual(withSkills.base.unquantified, []);
     assert.equal(stats({ skills: [skill('Multiplicator_R', 'Multiplicateur', 0)] }).bonusFactor, 2);
     assert.equal(withSkills.bonusFactor, 1);
   });

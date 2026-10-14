@@ -14,6 +14,11 @@
 
 /** +10 % de dégâts et de soins par point de bonus élémentaire accumulé. */
 export const BONUS_RATE = 0.1;
+/**
+ * Borne haute des bonus « par coup reçu » (Sac de frappe) : la carte est frappée à chaque tour,
+ * une fois. La borne basse (jamais frappée) est l'analyse principale.
+ */
+export const HITS_PER_TURN_WHEN_ALWAYS_HIT = 1;
 /** Horizon de simulation par défaut (tours). */
 export const DEFAULT_TURNS = 10;
 export const MAX_TURNS = 50;
@@ -61,6 +66,8 @@ export interface StatContribution {
   readonly allyResistances: ElementAmounts;
   readonly abilities: readonly AbilityModel[];
   readonly passiveBonusPerTurn: ElementAmounts;
+  /** Éléments générés à chaque attaque subie (Sac de frappe). */
+  readonly bonusPerHit: ElementAmounts;
   readonly startingBonus: ElementAmounts;
   readonly startingBoosts: readonly Boost[];
   readonly boostsPerTurn: readonly Boost[];
@@ -73,6 +80,7 @@ export const NO_CONTRIBUTION: StatContribution = {
   allyResistances: {},
   abilities: [],
   passiveBonusPerTurn: {},
+  bonusPerHit: {},
   startingBonus: {},
   startingBoosts: [],
   boostsPerTurn: [],
@@ -154,11 +162,56 @@ export interface DeckAnalysis {
   readonly turns: readonly TurnProjection[];
   readonly cards: readonly DeckCardSummary[];
   readonly unquantified: readonly { readonly cardName: string; readonly source: string; readonly reason: string }[];
+  /**
+   * Borne haute si le deck a des bonus « par coup reçu » (Sac de frappe) : mêmes mesures quand
+   * les cartes concernées sont frappées à chaque tour. L'analyse principale suppose qu'elles ne le
+   * sont jamais. Absent sinon.
+   */
+  readonly whenAlwaysHit: DeckScenario | null;
+}
+
+/** Mesures d'un scénario alternatif de la simulation. */
+export interface DeckScenario {
+  readonly hitsPerTurn: number;
+  readonly totalDamagePerTurn: number;
+  readonly totalSingleTargetDamagePerTurn: number;
+  readonly totalHealPerTurn: number;
+  readonly damagePerTurn: ElementAmounts;
+  readonly generatedPerTurn: ElementAmounts;
+  readonly turns: readonly TurnProjection[];
 }
 
 const NO_BOOSTS: CardBoosts = { precision: 0, critChance: 0, critMultiplier: 0, baseDamage: 0, baseHeal: 0 };
 
 export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalysisOptions = {}): DeckAnalysis {
+  const neverHit = simulate(cards, options, 0);
+  const hitSensitive = cards.some((card) =>
+    [card.base.bonusPerHit, card.talent.bonusPerHit].some((amounts) => Object.keys(amounts).length > 0),
+  );
+  if (!hitSensitive) {
+    return { ...neverHit, whenAlwaysHit: null };
+  }
+  const alwaysHit = simulate(cards, options, HITS_PER_TURN_WHEN_ALWAYS_HIT);
+  return {
+    ...neverHit,
+    whenAlwaysHit: {
+      hitsPerTurn: HITS_PER_TURN_WHEN_ALWAYS_HIT,
+      totalDamagePerTurn: alwaysHit.totalDamagePerTurn,
+      totalSingleTargetDamagePerTurn: alwaysHit.totalSingleTargetDamagePerTurn,
+      totalHealPerTurn: alwaysHit.totalHealPerTurn,
+      damagePerTurn: alwaysHit.damagePerTurn,
+      generatedPerTurn: alwaysHit.generatedPerTurn,
+      turns: alwaysHit.turns,
+    },
+  };
+}
+
+/** Simulation complète, chaque carte à bonus « par coup reçu » subissant `hitsPerTurn` attaques par tour. */
+function simulate(
+  cards: readonly DeckCardStats[],
+  options: DeckAnalysisOptions,
+  hitsPerTurn: number,
+): Omit<DeckAnalysis, 'whenAlwaysHit'> {
   const turnCount = Math.min(Math.max(1, Math.floor(options.turns ?? DEFAULT_TURNS)), MAX_TURNS);
   const dpsIndex = cards.findIndex((card) => card.cardId === options.dpsCardId);
   const notes = cards.flatMap((card) =>
@@ -243,7 +296,12 @@ export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalys
     const generated: Record<string, number> = {};
     const consumed: Record<string, number> = {};
     cards.forEach((card, index) => {
-      const byCard = sum([card.base.passiveBonusPerTurn, card.talent.passiveBonusPerTurn]);
+      const byCard = sum([
+        card.base.passiveBonusPerTurn,
+        card.talent.passiveBonusPerTurn,
+        scale(card.base.bonusPerHit, hitsPerTurn),
+        scale(card.talent.bonusPerHit, hitsPerTurn),
+      ]);
       abilities[index]?.forEach((ability, abilityIndex) => {
         const rate = usedNow(index, abilityIndex);
         const growth = ability.growth.bonus * (uses[index]?.[abilityIndex] ?? 0);

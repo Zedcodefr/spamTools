@@ -47,8 +47,8 @@ describe('Deck', () => {
 });
 
 const empty: StatContribution = {
-  resistances: {}, allyResistances: {}, abilities: [], passiveBonusPerTurn: {}, startingBonus: {}, startingBoosts: [],
-  boostsPerTurn: [], unquantified: [],
+  resistances: {}, allyResistances: {}, abilities: [], passiveBonusPerTurn: {}, bonusPerHit: {}, startingBonus: {},
+  startingBoosts: [], boostsPerTurn: [], unquantified: [],
 };
 
 const line = (value: number, element = 'fire', targets = 1, singleTarget = 1) => ({
@@ -196,6 +196,16 @@ describe('analyzeDeck : simulation', () => {
       cardStats('b', { abilities: [ability({ damage: [line(10)] })] }),
     ];
     assert.deepEqual(damageByTurn(cards, 1), [10 * 2 + 10 * 1.5]);
+  });
+
+  it('donne une fourchette pour le Sac de frappe : jamais frappé / frappé à chaque tour', () => {
+    const cards = [cardStats('bag', { abilities: [ability({ damage: [line(10, 'nature')] })], bonusPerHit: { nature: 1 } })];
+    const analysis = analyzeDeck(cards, { turns: 3 });
+    assert.deepEqual(analysis.turns.map((turn) => turn.totalDamage), [10, 10, 10]);
+    // Toujours frappée : +1 nature par tour, compté dès le tour -> +10 %, +20 %, +30 %.
+    assert.deepEqual(analysis.whenAlwaysHit?.turns.map((turn) => turn.totalDamage), [11, 12, 13]);
+    assert.equal(analysis.whenAlwaysHit?.totalDamagePerTurn, 12);
+    assert.equal(analyzeDeck([cardStats('a', { abilities: [ability({ damage: [line(10)] })] })]).whenAlwaysHit, null);
   });
 
   it('applique les renforts de talent au départ et à chaque tour', () => {

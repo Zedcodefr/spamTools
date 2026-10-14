@@ -85,6 +85,14 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
         . Précision, critique, bonus cumulés et renforts compris
         {analysis.dpsCardId === null ? ' (aucun DPS choisi pour les renforts ciblés).' : '.'}
       </p>
+      {analysis.whenAlwaysHit !== null && (
+        <p className="deck-analysis__summary">
+          Sac de frappe : de <strong>{number.format(analysis.totalDamagePerTurn)}</strong> (jamais frappé) à{' '}
+          <strong>{number.format(analysis.whenAlwaysHit.totalDamagePerTurn)}</strong> dégâts totaux par tour (frappé{' '}
+          {analysis.whenAlwaysHit.hitsPerTurn === 1 ? 'une fois' : `${analysis.whenAlwaysHit.hitsPerTurn} fois`} à
+          chaque tour).
+        </p>
+      )}
 
       <h4>
         Dégâts par tour
@@ -108,6 +116,17 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
           { ...TOTAL, values: along((turn) => turn.totalDamage) },
           { ...SINGLE, values: along((turn) => turn.totalSingleTargetDamage) },
         ]}
+        upperBounds={
+          analysis.whenAlwaysHit === null
+            ? []
+            : [
+                {
+                  of: TOTAL.key,
+                  label: 'Totaux si toujours frappé',
+                  values: [0, ...analysis.whenAlwaysHit.turns.map((turn) => turn.totalDamage)],
+                },
+              ]
+        }
       />
       {hasHeal && (
         <>
@@ -299,15 +318,19 @@ function DataTables({ analysis, elements }: { analysis: DeckAnalysis; elements: 
             <th scope="col">Dégâts</th>
             <th scope="col">Cible unique</th>
             <th scope="col">Soins</th>
+            {analysis.whenAlwaysHit !== null && <th scope="col">Dégâts si frappé</th>}
           </tr>
         </thead>
         <tbody>
-          {analysis.turns.map((turn) => (
+          {analysis.turns.map((turn, index) => (
             <tr key={turn.turn}>
               <th scope="row">{turn.turn}</th>
               <td>{number.format(turn.totalDamage)}</td>
               <td>{number.format(turn.totalSingleTargetDamage)}</td>
               <td>{turn.totalHeal > 0 ? number.format(turn.totalHeal) : '–'}</td>
+              {analysis.whenAlwaysHit !== null && (
+                <td>{number.format(analysis.whenAlwaysHit.turns[index]?.totalDamage ?? 0)}</td>
+              )}
             </tr>
           ))}
         </tbody>

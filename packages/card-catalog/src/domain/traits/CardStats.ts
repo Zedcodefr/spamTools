@@ -83,6 +83,11 @@ export interface StatContribution {
   readonly abilities: readonly AbilityModel[];
   /** Éléments générés à chaque tour sans action (Cœurs). */
   readonly passiveBonusPerTurn: ElementAmounts;
+  /**
+   * Éléments générés à chaque attaque subie (Sac de frappe : +1 dans l'élément de la carte).
+   * Dépend de la partie : l'analyse en donne une fourchette (jamais frappée / toujours frappée).
+   */
+  readonly bonusPerHit: ElementAmounts;
   /** Éléments obtenus une fois, en début de partie. */
   readonly startingBonus: ElementAmounts;
   /** Renforts obtenus une fois en début de partie, et à chaque tour. */

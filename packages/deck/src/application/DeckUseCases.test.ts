@@ -8,7 +8,7 @@ import type { DeckCardStatsProvider } from './ports/index.js';
 import { SaveDeck } from './SaveDeck.js';
 
 const empty: StatContribution = {
-  resistances: { fire: 10 }, allyResistances: {}, passiveBonusPerTurn: {}, startingBonus: {}, startingBoosts: [],
+  resistances: { fire: 10 }, allyResistances: {}, passiveBonusPerTurn: {}, bonusPerHit: {}, startingBonus: {}, startingBoosts: [],
   boostsPerTurn: [], unquantified: [],
   abilities: [
     {

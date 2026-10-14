@@ -114,7 +114,7 @@ export function computeCardStats(card: CardData, context: StatsContext): CardSta
     }
   }
   for (const skill of card.skills) {
-    addPassive(base, context.keyOf(skill.name), skill.name, skill.value, context);
+    addPassive(base, context.keyOf(skill.name), skill.value, card, context);
   }
 
   const talents: Record<string, StatContribution> = {};
@@ -258,14 +258,20 @@ function toBoosts(action: CardAction, value: number, text: string, critChance: n
 }
 
 /** Passif naturel (tox ou accordé par un talent) : Cœurs élémentaires, Sac de frappe. */
-function addPassive(stats: Contribution, key: string, label: string, perTurn: number, context: StatsContext): boolean {
+function addPassive(
+  stats: Contribution,
+  key: string,
+  perTurn: number,
+  card: CardData,
+  context: StatsContext,
+): boolean {
   const element = context.passiveElement(key);
   if (element !== undefined && perTurn > 0) {
     stats.addAmount('passiveBonusPerTurn', element, perTurn);
     return true;
   }
   if (key === PUNCHING_BAG_KEY) {
-    stats.note(label, "+1 dans l'élément de la carte à chaque attaque subie : dépend de la partie, non compté");
+    stats.addAmount('bonusPerHit', card.element, 1);
     return true;
   }
   return false;
@@ -276,7 +282,7 @@ function talentContribution(talent: Talent, card: CardData, context: StatsContex
   const granted = context.grantedPassive(talent);
   if (granted !== undefined) {
     const perTurn = Number(/\(\+(\d+(?:[.,]\d+)?)\)/.exec(granted.description ?? '')?.[1]?.replace(',', '.') ?? 1);
-    if (addPassive(stats, granted.key, talent.name, perTurn, context)) {
+    if (addPassive(stats, granted.key, perTurn, card, context)) {
       return stats;
     }
   }
@@ -355,7 +361,7 @@ function elementShares(action: CardAction, card: CardData, text: string, context
   return {};
 }
 
-type AmountField = 'resistances' | 'allyResistances' | 'passiveBonusPerTurn' | 'startingBonus';
+type AmountField = 'resistances' | 'allyResistances' | 'passiveBonusPerTurn' | 'bonusPerHit' | 'startingBonus';
 
 class Contribution {
   readonly abilities: AbilityModel[] = [];
@@ -365,6 +371,7 @@ class Contribution {
     resistances: {},
     allyResistances: {},
     passiveBonusPerTurn: {},
+    bonusPerHit: {},
     startingBonus: {},
   };
   private readonly notes = new Map<string, UnquantifiedEffect>();
@@ -390,6 +397,7 @@ class Contribution {
       allyResistances: round(this.amounts.allyResistances),
       abilities: this.abilities,
       passiveBonusPerTurn: round(this.amounts.passiveBonusPerTurn),
+      bonusPerHit: round(this.amounts.bonusPerHit),
       startingBonus: round(this.amounts.startingBonus),
       startingBoosts: this.startingBoosts,
       boostsPerTurn: this.boostsPerTurn,
