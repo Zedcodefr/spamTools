@@ -1,0 +1,20 @@
+{
+  "name": "@spamtools/card-catalog",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Catalogue des cartes du jeu Spam : modèle, synchronisation depuis spamgame.com, consultation",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./infrastructure": { "types": "./dist/infrastructure/index.d.ts", "default": "./dist/infrastructure/index.js" }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "tsc -b && node --test \"dist/**/*.test.js\""
+  },
+  "dependencies": {
+    "@spamtools/shared-kernel": "workspace:*"
+  }
+}

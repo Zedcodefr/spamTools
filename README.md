@@ -10,6 +10,7 @@ packages/
   shared-kernel/        Briques DDD communes (Entity, ValueObject, AggregateRoot, UseCase...)
   database/             Gestion BDD : connexion, migrations
   data-import/          Import de données : sources, suivi des imports
+  card-catalog/         Catalogue des cartes : modèle, synchro depuis spamgame.com, consultation
 ```
 
 ## Couches (dans chaque package)
@@ -54,4 +55,12 @@ pnpm install
 pnpm dev       # tsc en watch + API (port 3000) + Vite (http://localhost:5173)
 pnpm build     # build de tous les packages et apps
 pnpm typecheck
+pnpm --filter @spamtools/card-catalog test   # tests (node:test)
 ```
+
+## Données des cartes
+
+Source : fichiers publiés par l'éditeur sur `https://spamgame.com/data/` (pas de scraping).
+Utilisation soumise aux [conditions d'utilisation des données](https://spamgame.com/conditions-donnees-cartes) :
+projet non commercial, **artiste crédité** sur chaque illustration affichée, **mention « projet non officiel »**,
+pas de logo du jeu.
