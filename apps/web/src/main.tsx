@@ -1,13 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { HttpImportGateway } from './infrastructure/HttpImportGateway.ts';
 import { App } from './ui/App.tsx';
 import { GatewaysProvider, type Gateways } from './ui/GatewaysContext.tsx';
 
 // Racine de composition du front : on choisit ici les implémentations des ports.
-const gateways: Gateways = {
-  imports: new HttpImportGateway(),
-};
+const gateways: Gateways = {};
 
 const root = document.getElementById('root');
 if (root === null) {

@@ -1,10 +1,7 @@
 import { GetCard, ListCards, SyncCatalog } from '@spamtools/card-catalog';
 import { FileSystemAssetStore, SpamGameCatalogSource } from '@spamtools/card-catalog/infrastructure';
-import { RunImport } from '@spamtools/data-import';
-import { InMemoryImportJobRepository, JsonFileSourceReader } from '@spamtools/data-import/infrastructure';
 import { MigrateDatabase } from '@spamtools/database';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
-import { InMemoryRecordSink } from './adapters/InMemoryRecordSink.js';
 import { SqliteCatalogRepository } from './adapters/catalog/SqliteCatalogRepository.js';
 import type { AppConfig } from './config.js';
 import { migrations } from './migrations.js';
@@ -25,17 +22,10 @@ export async function createContainer(config: AppConfig) {
     new FileSystemAssetStore(config.assetsDirectory),
   );
 
-  const runImport = new RunImport(
-    [new JsonFileSourceReader()],
-    new InMemoryRecordSink(),
-    new InMemoryImportJobRepository(),
-  );
-
   return {
     syncCatalog,
     listCards: new ListCards(catalogs),
     getCard: new GetCard(catalogs),
-    runImport,
     close: () => database.close(),
   };
 }

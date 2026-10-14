@@ -11,10 +11,21 @@ export interface SyncCatalogInput {
   readonly version?: string | undefined;
 }
 
+export interface AssetFailure {
+  readonly path: string;
+  readonly reason: string;
+}
+
 export interface AssetSyncReport {
   readonly downloaded: number;
   readonly alreadyPresent: number;
-  readonly failures: readonly { readonly path: string; readonly reason: string }[];
+  /** Images référencées par les données mais non récupérées. */
+  readonly failures: readonly AssetFailure[];
+  /**
+   * Variantes du cadre que la source ne publie pas : le plan de carte décline certaines
+   * images pour chaque élément ou rareté (ex. `skill-line-{rarity}`), sans que toutes existent.
+   */
+  readonly unavailableFrameVariants: readonly AssetFailure[];
 }
 
 export interface SyncCatalogOutput {
@@ -58,7 +69,7 @@ export class SyncCatalog implements UseCase<SyncCatalogInput, SyncCatalogOutput>
 
     // Images d'abord : un catalogue enregistré ne doit pas référencer d'images absentes
     // (hors celles que la source n'a pas pu fournir, signalées dans le rapport).
-    const assets = await this.syncAssets([...catalog.assetPaths(), ...layout.assetPaths(catalog)]);
+    const assets = await this.syncAssets(catalog.assetPaths(), layout.assetPaths(catalog));
 
     const alreadyImported = await this.repository.has(version, input.language);
     if (!alreadyImported) {
@@ -75,11 +86,16 @@ export class SyncCatalog implements UseCase<SyncCatalogInput, SyncCatalogOutput>
     };
   }
 
-  private async syncAssets(paths: readonly AssetPath[]): Promise<AssetSyncReport> {
-    const unique = [...new Map(paths.map((path) => [path.value, path])).values()];
+  private async syncAssets(
+    required: readonly AssetPath[],
+    frameVariants: readonly AssetPath[],
+  ): Promise<AssetSyncReport> {
+    const requiredPaths = new Set(required.map((path) => path.value));
+    const unique = [...new Map([...required, ...frameVariants].map((path) => [path.value, path])).values()];
     let downloaded = 0;
     let alreadyPresent = 0;
-    const failures: { path: string; reason: string }[] = [];
+    const failures: AssetFailure[] = [];
+    const unavailableFrameVariants: AssetFailure[] = [];
 
     await forEachConcurrently(unique, ASSET_DOWNLOAD_CONCURRENCY, async (path) => {
       if (await this.assets.has(path)) {
@@ -90,11 +106,17 @@ export class SyncCatalog implements UseCase<SyncCatalogInput, SyncCatalogOutput>
         await this.assets.put(path, await this.source.fetchAsset(path));
         downloaded++;
       } catch (error) {
-        failures.push({ path: path.value, reason: error instanceof Error ? error.message : String(error) });
+        const failure = { path: path.value, reason: error instanceof Error ? error.message : String(error) };
+        (requiredPaths.has(path.value) ? failures : unavailableFrameVariants).push(failure);
       }
     });
 
-    failures.sort((a, b) => a.path.localeCompare(b.path));
-    return { downloaded, alreadyPresent, failures };
+    const byPath = (a: AssetFailure, b: AssetFailure) => a.path.localeCompare(b.path);
+    return {
+      downloaded,
+      alreadyPresent,
+      failures: failures.sort(byPath),
+      unavailableFrameVariants: unavailableFrameVariants.sort(byPath),
+    };
   }
 }

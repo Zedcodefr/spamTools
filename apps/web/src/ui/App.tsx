@@ -1,13 +1,8 @@
-import { ImportForm } from './import/ImportForm.tsx';
-
 export function App() {
   return (
     <main>
       <h1>spamTools</h1>
-      <section>
-        <h2>Import de données</h2>
-        <ImportForm />
-      </section>
+      <p>Outils pour le jeu Spam. La consultation des cartes arrive bientôt.</p>
     </main>
   );
 }

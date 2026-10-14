@@ -95,6 +95,16 @@ describe('SyncCatalog', () => {
 
     assert.equal(result.status, 'imported');
     assert.deepEqual(result.assets.failures, [{ path: 'img/frame/rarity-divine.webp', reason: 'HTTP 404' }]);
+    assert.deepEqual(result.assets.unavailableFrameVariants, []);
+  });
+
+  it('distingue une variante de cadre non publiée d\'une image manquante', async () => {
+    source.missingAssets.add('img/frame/body-water.webp');
+
+    const result = await sync.execute({ language: 'fr' });
+
+    assert.deepEqual(result.assets.failures, []);
+    assert.deepEqual(result.assets.unavailableFrameVariants, [{ path: 'img/frame/body-water.webp', reason: 'HTTP 404' }]);
   });
 
   it('conserve chaque version importée', async () => {

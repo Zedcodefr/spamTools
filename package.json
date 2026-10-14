@@ -8,9 +8,10 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "clean": "tsc -b --clean",
-    "typecheck": "tsc -b --noEmit && pnpm --filter @spamtools/web typecheck",
+    "typecheck": "tsc -b && pnpm --filter @spamtools/web typecheck",
     "dev": "pnpm build && concurrently -k -n tsc,api,web -c blue,green,magenta \"tsc -b -w --preserveWatchOutput\" \"pnpm --filter @spamtools/api dev\" \"pnpm --filter @spamtools/web dev\"",
-    "start": "pnpm --filter @spamtools/api start"
+    "start": "pnpm --filter @spamtools/api start",
+    "sync": "tsc -b && pnpm --filter @spamtools/api sync"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

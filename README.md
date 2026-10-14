@@ -9,7 +9,6 @@ apps/
 packages/
   shared-kernel/        Briques DDD communes (Entity, ValueObject, AggregateRoot, UseCase...)
   database/             Gestion BDD : connexion, migrations
-  data-import/          Import de données : sources, suivi des imports
   card-catalog/         Catalogue des cartes : modèle, synchro depuis spamgame.com, consultation
 ```
 
@@ -25,7 +24,7 @@ packages/
 - L'infrastructure est exposée séparément (`@spamtools/xxx/infrastructure`) et ne doit être
   importée que par la racine de composition (`apps/api/src/container.ts`).
 - Aucun package ne dépend d'un autre package métier : c'est l'app qui les relie via les ports
-  (ex. `RecordSink` de `data-import` sera implémenté avec `database`).
+  (ex. le port `CatalogRepository` de `card-catalog` est implémenté dans `apps/api` avec `database`).
 
 ## apps/api
 
@@ -40,8 +39,8 @@ Même séparation, côté front :
 | Dossier           | Contenu                                                    |
 |-------------------|------------------------------------------------------------|
 | `domain/`         | Types et règles métier — TS pur, sans React ni `fetch`     |
-| `application/`    | Ports (ex. `ImportGateway`)                                |
-| `infrastructure/` | Adaptateurs (ex. `HttpImportGateway` qui appelle l'API)    |
+| `application/`    | Ports (interfaces d'accès aux données)                     |
+| `infrastructure/` | Adaptateurs (ex. passerelle HTTP qui appelle l'API)        |
 | `ui/`             | Composants React ; récupèrent les ports via `useGateways()` |
 | `main.tsx`        | Racine de composition du front                             |
 
@@ -56,6 +55,7 @@ pnpm dev       # tsc en watch + API (port 3000) + Vite (http://localhost:5173)
 pnpm build     # build de tous les packages et apps
 pnpm typecheck
 pnpm test       # tests (node:test) de tous les packages
+pnpm sync       # importe la dernière version des cartes (voir ci-dessous)
 ```
 
 ## Données des cartes
@@ -64,3 +64,15 @@ Source : fichiers publiés par l'éditeur sur `https://spamgame.com/data/` (pas 
 Utilisation soumise aux [conditions d'utilisation des données](https://spamgame.com/conditions-donnees-cartes) :
 projet non commercial, **artiste crédité** sur chaque illustration affichée, **mention « projet non officiel »**,
 pas de logo du jeu.
+
+Mise à jour manuelle, en ligne de commande :
+
+```sh
+pnpm sync                    # dernière version publiée
+pnpm sync --version 1.20     # une version précise
+pnpm sync --all              # toutes les versions publiées
+```
+
+Chaque version est conservée. Relancer la synchro ne réimporte pas une version déjà en base
+et ne télécharge que les images manquantes. Les données sont dans `data/` (base `spamtools.sqlite`
+et images dans `assets/`), ou dans le dossier indiqué par `SPAMTOOLS_DATA_DIR`.
