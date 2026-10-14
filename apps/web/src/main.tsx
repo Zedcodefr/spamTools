@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HttpCatalogGateway } from './infrastructure/HttpCatalogGateway.ts';
+import { HttpDeckGateway } from './infrastructure/HttpDeckGateway.ts';
 import { App } from './ui/App.tsx';
 import { GatewaysProvider, type Gateways } from './ui/GatewaysContext.tsx';
 import './ui/styles.css';
@@ -8,6 +9,7 @@ import './ui/styles.css';
 // Racine de composition du front : on choisit ici les implémentations des ports.
 const gateways: Gateways = {
   catalog: new HttpCatalogGateway(),
+  decks: new HttpDeckGateway(),
 };
 
 const root = document.getElementById('root');

@@ -10,6 +10,7 @@ packages/
   shared-kernel/        Briques DDD communes (Entity, ValueObject, AggregateRoot, UseCase...)
   database/             Gestion BDD : connexion, migrations
   card-catalog/         Catalogue des cartes : modèle, synchro depuis spamgame.com, consultation
+  deck/                 Decks : composition (4 cartes et leur talent), enregistrement, analyse
 ```
 
 ## Couches (dans chaque package)
@@ -43,6 +44,8 @@ Routes (lecture seule ; sans `version`, la plus récente importée est servie) :
 | `GET /api/cards/:id?version=` | Une carte                                                      |
 | `GET /api/card-layout`        | Plan de rendu des cartes publié par le jeu                     |
 | `GET /api/assets/<chemin>`    | Images (chemins renvoyés par les routes ci-dessus)             |
+| `GET/POST /api/decks`, `GET/PUT/DELETE /api/decks/:id` | Decks enregistrés                     |
+| `POST /api/decks/analysis`    | Analyse d'une composition `{ version, slots, turns }`          |
 
 ## apps/web (React)
 
@@ -104,3 +107,21 @@ modification des règles, incrémenter `ANALYSIS_VERSION` puis lancer `pnpm sync
 Chaque version est conservée. Relancer la synchro ne réimporte pas une version déjà en base
 et ne télécharge que les images manquantes. Les données sont dans `data/` (base `spamtools.sqlite`
 et images dans `assets/`), ou dans le dossier indiqué par `SPAMTOOLS_DATA_DIR`.
+
+## Deck builder (`/deck`)
+
+Clic gauche sur une carte de la galerie : l'ajouter au deck (4 cartes, sans doublon) ou l'en retirer ;
+un talent par carte. L'analyse est une **espérance par tour**, les 4 cartes agissant à chaque tour :
+
+- capacité de recharge N : utilisée une fois tous les N tours (Écho : chance de rester disponible) ;
+- dégâts et soins : moyenne min/max × précision × espérance de critique ; attaque de zone × 4 cibles ;
+  « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
+- éléments générés (bonus des capacités, Cœurs naturels) et consommés (coûts), bonus de départ (talents) ;
+- bonus cumulés : le stock de chaque élément gagne les générés et perd les consommés à chaque tour ;
+  chaque point ajoute +10 % aux dégâts et soins de cet élément (×2 avec Multiplicateur) — projection
+  tour par tour et moyenne sur l'horizon choisi ;
+- résistances moyennes des 4 cartes, talents permanents et bonus d'équipe compris ; faiblesse = la plus basse.
+
+Les effets conditionnels, à usage limité ou en pourcentage de PV sont listés « non chiffrés ».
+Les statistiques par carte sont calculées à l'import (`computeCardStats`), l'analyse ne fait que les combiner.
+

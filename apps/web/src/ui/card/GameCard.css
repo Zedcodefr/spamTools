@@ -20,6 +20,15 @@
   transform: translateY(-3px);
 }
 
+.game-card__frame[data-selectable] {
+  cursor: pointer;
+}
+
+.game-card__frame[data-selected] {
+  outline: 4px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .game-card__frame:focus-visible {
   outline: 3px solid var(--accent);
 }

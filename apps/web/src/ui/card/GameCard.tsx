@@ -14,13 +14,25 @@ export interface GameCardProps {
   readonly highDefinition?: boolean;
   /** Crédit de l'artiste sous la carte (obligatoire là où l'illustration n'est pas déjà créditée). */
   readonly showCredit?: boolean;
+  /** Clic gauche (ou Entrée) : action propre à l'outil qui affiche la carte (ex. l'ajouter à un deck). */
+  readonly onSelect?: ((card: Card) => void) | undefined;
+  /** Mise en évidence (ex. carte présente dans le deck). */
+  readonly selected?: boolean;
 }
 
 /**
  * Une carte du jeu, dessinée d'après le plan de rendu publié par le jeu.
  * Clic droit (ou touche Menu) : ouvre la vue détail, si elle est disponible.
+ * Clic gauche (ou Entrée) : `onSelect`, si l'outil en fournit un.
  */
-export function GameCard({ card, width, highDefinition = false, showCredit = true }: GameCardProps) {
+export function GameCard({
+  card,
+  width,
+  highDefinition = false,
+  showCredit = true,
+  onSelect,
+  selected = false,
+}: GameCardProps) {
   const { layout, assetUrl } = useCardEnvironment();
   const detail = useCardDetail();
   const scale = width / layout.width;
@@ -42,9 +54,24 @@ export function GameCard({ card, width, highDefinition = false, showCredit = tru
         className="game-card__frame"
         style={{ width, height: layout.height * scale }}
         tabIndex={0}
+        role={onSelect === undefined ? undefined : 'button'}
         aria-label={card.name}
+        aria-pressed={onSelect === undefined ? undefined : selected}
+        data-selected={selected ? '' : undefined}
+        data-selectable={onSelect === undefined ? undefined : ''}
         title={detail === null ? card.name : `${card.name} — clic droit pour le détail`}
         onContextMenu={openDetail}
+        onClick={onSelect === undefined ? undefined : () => onSelect(card)}
+        onKeyDown={
+          onSelect === undefined
+            ? undefined
+            : (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(card);
+                }
+              }
+        }
       >
         <div
           className="game-card__face"

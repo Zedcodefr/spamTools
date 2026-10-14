@@ -82,10 +82,20 @@ button:disabled {
   letter-spacing: 0.02em;
 }
 
-.app__section {
+.app__nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.app__nav a {
   font-family: var(--font-display);
-  color: var(--accent);
   text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.app__nav a[aria-current='page'] {
+  color: var(--accent);
 }
 
 .app__main {

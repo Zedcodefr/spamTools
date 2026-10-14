@@ -1,0 +1,241 @@
+.deck-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 500px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.deck-panel {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.deck-panel__head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+}
+
+.deck-panel__name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+
+.deck-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.deck-panel__message {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.deck-panel__message--error {
+  color: #ff8a8a;
+}
+
+.deck-panel__slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.deck-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem 0.5rem 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--surface-raised);
+}
+
+.deck-slot--empty {
+  justify-content: center;
+  min-height: 220px;
+  color: var(--text-muted);
+  border: 2px dashed var(--border);
+  background: transparent;
+}
+
+.deck-slot__talent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.deck-slot__talent label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--text-muted);
+}
+
+.deck-slot__talent select {
+  width: 100%;
+}
+
+.deck-slot__talent-effect {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.deck-analysis h3,
+.deck-analysis h4 {
+  margin: 0.75rem 0 0.4rem;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.deck-analysis h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.deck-analysis__state {
+  color: var(--text-muted);
+}
+
+.deck-analysis__summary {
+  margin: 0 0 0.6rem;
+  line-height: 1.5;
+}
+
+.deck-analysis__muted {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.deck-analysis__scroll {
+  overflow-x: auto;
+}
+
+.deck-analysis__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-analysis__table th,
+.deck-analysis__table td {
+  padding: 0.3rem 0.3rem;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.deck-analysis__table thead th {
+  color: var(--text-muted);
+  font-weight: normal;
+  cursor: help;
+}
+
+.deck-analysis__table tbody th {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-align: left;
+  font-weight: normal;
+}
+
+.deck-analysis__table img {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.deck-analysis__table tr[data-weak] td:nth-of-type(1) {
+  color: #ff8a8a;
+  font-weight: 700;
+}
+
+.deck-analysis__table--turns tbody th {
+  display: table-cell;
+  text-align: right;
+}
+
+.deck-analysis__stock {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.deck-analysis__stock span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.deck-analysis__weakness {
+  margin: 0.5rem 0 0;
+  color: #ff8a8a;
+  font-size: 0.85rem;
+}
+
+.deck-analysis__cards,
+.deck-analysis__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.deck-analysis__cards li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.deck-analysis__notes li {
+  color: var(--text-muted);
+}
+
+.deck-analysis__turns {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.deck-analysis__turns input {
+  width: 4rem;
+}
+
+@media (max-width: 1100px) {
+  .deck-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-panel {
+    position: static;
+    max-height: none;
+  }
+}
