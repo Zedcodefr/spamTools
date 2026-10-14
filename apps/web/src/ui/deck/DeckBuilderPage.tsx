@@ -7,6 +7,7 @@ import {
   removeCard,
   setTalent,
   toggleCard,
+  toggleDps,
   type DeckAnalysis,
   type DeckDraft,
   type DeckView,
@@ -59,7 +60,7 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
     try {
       const name = draft.name.trim() || 'Deck sans nom';
       const saved = await gateway.save({ ...draft, name, version: data.catalog.version });
-      setDraft({ id: saved.id, name: saved.name, slots: saved.slots });
+      setDraft({ id: saved.id, name: saved.name, slots: saved.slots, dpsCardId: saved.dpsCardId });
       setMessage({ kind: 'info', text: `Deck « ${saved.name} » enregistré.` });
       refreshDecks();
     } catch (error) {
@@ -82,7 +83,7 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
   };
 
   const open = (deck: DeckView) => {
-    setDraft({ id: deck.id, name: deck.name, slots: deck.slots });
+    setDraft({ id: deck.id, name: deck.name, slots: deck.slots, dpsCardId: deck.dpsCardId });
     setMessage(null);
     if (deck.version !== data.catalog.version) {
       onVersionChange(deck.version);
@@ -167,8 +168,9 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
               );
             }
             const talent = card.talents.find((candidate) => candidate.slot === slot.talentSlot);
+            const isDps = draft.dpsCardId === card.id;
             return (
-              <li key={card.id} className="deck-slot">
+              <li key={card.id} className="deck-slot" data-dps={isDps ? '' : undefined}>
                 <GameCard card={card} width={SLOT_CARD_WIDTH} showCredit />
                 <div className="deck-slot__talent">
                   <label>
@@ -187,9 +189,19 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
                     </select>
                   </label>
                   {talent && <p className="deck-slot__talent-effect">{talent.effect}</p>}
-                  <button type="button" onClick={() => setDraft(removeCard(draft, card.id))}>
-                    Retirer
-                  </button>
+                  <div className="deck-slot__buttons">
+                    <button
+                      type="button"
+                      aria-pressed={isDps}
+                      title="Le DPS reçoit les renforts ciblés des autres cartes (précision, critique, dégâts de base)"
+                      onClick={() => setDraft(toggleDps(draft, card.id))}
+                    >
+                      DPS
+                    </button>
+                    <button type="button" onClick={() => setDraft(removeCard(draft, card.id))}>
+                      Retirer
+                    </button>
+                  </div>
                 </div>
               </li>
             );
@@ -213,6 +225,7 @@ function useDeckAnalysis(version: string, draft: DeckDraft, turns: number): Anal
   const { decks: gateway } = useGateways();
   const [state, setState] = useState<AnalysisState>({ status: 'empty' });
   const slotsKey = JSON.stringify(draft.slots);
+  const { dpsCardId } = draft;
 
   useEffect(() => {
     const slots = JSON.parse(slotsKey) as DeckDraft['slots'];
@@ -222,7 +235,7 @@ function useDeckAnalysis(version: string, draft: DeckDraft, turns: number): Anal
     }
     let cancelled = false;
     setState({ status: 'loading' });
-    gateway.analyze(version, slots, turns).then(
+    gateway.analyze(version, slots, turns, dpsCardId).then(
       (analysis) => !cancelled && setState({ status: 'ready', analysis }),
       (error: unknown) =>
         !cancelled && setState({ status: 'error', message: error instanceof Error ? error.message : String(error) }),
@@ -230,7 +243,7 @@ function useDeckAnalysis(version: string, draft: DeckDraft, turns: number): Anal
     return () => {
       cancelled = true;
     };
-  }, [gateway, version, slotsKey, turns]);
+  }, [gateway, version, slotsKey, turns, dpsCardId]);
 
   return state;
 }

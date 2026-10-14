@@ -20,7 +20,13 @@ export class SaveDeck implements UseCase<SaveDeckInput, DeckView> {
   ) {}
 
   async execute(input: SaveDeckInput): Promise<DeckView> {
-    const content: DeckContent = { name: input.name, version: input.version, language: input.language, slots: input.slots };
+    const content: DeckContent = {
+      name: input.name,
+      version: input.version,
+      language: input.language,
+      slots: input.slots,
+      dpsCardId: input.dpsCardId ?? null,
+    };
     let deck: Deck;
     if (input.id === undefined) {
       deck = Deck.create(content, this.clock());

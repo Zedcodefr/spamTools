@@ -15,6 +15,8 @@ export interface DeckContent {
   readonly version: string;
   readonly language: string;
   readonly slots: readonly DeckSlot[];
+  /** Carte qui reçoit les renforts ciblés des autres (précision, critique, dégâts de base). Facultatif. */
+  readonly dpsCardId?: string | null | undefined;
 }
 
 /**
@@ -55,6 +57,10 @@ export class Deck extends AggregateRoot<DeckId> {
     return this.content.slots;
   }
 
+  get dpsCardId(): string | null {
+    return this.content.dpsCardId ?? null;
+  }
+
   get updatedAt(): Date {
     return this._updatedAt;
   }
@@ -81,6 +87,10 @@ export class Deck extends AggregateRoot<DeckId> {
         throw new DomainError(`Talent invalide pour la carte ${slot.cardId} : ${slot.talentSlot}`);
       }
     }
-    return { ...content, name, slots: content.slots.map((slot) => ({ ...slot })) };
+    const dpsCardId = content.dpsCardId ?? null;
+    if (dpsCardId !== null && !cardIds.has(dpsCardId)) {
+      throw new DomainError('Le DPS doit être une carte du deck');
+    }
+    return { ...content, name, dpsCardId, slots: content.slots.map((slot) => ({ ...slot })) };
   }
 }

@@ -10,14 +10,16 @@ export class SqliteDeckRepository implements DeckRepository {
   async save(deck: Deck): Promise<void> {
     this.database.transaction((db) => {
       db.prepare(
-        `INSERT INTO deck (id, name, version, language, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO deck (id, name, version, language, dps_card_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, version = excluded.version,
-           language = excluded.language, updated_at = excluded.updated_at`,
+           language = excluded.language, dps_card_id = excluded.dps_card_id, updated_at = excluded.updated_at`,
       ).run(
         deck.id.value,
         deck.name,
         deck.version,
         deck.language,
+        deck.dpsCardId,
         deck.createdAt.toISOString(),
         deck.updatedAt.toISOString(),
       );
@@ -51,7 +53,13 @@ export class SqliteDeckRepository implements DeckRepository {
       .map((slot) => ({ cardId: String(slot['card_id']), talentSlot: Number(slot['talent_slot']) }));
     return Deck.restore(
       new DeckId(id),
-      { name: String(row['name']), version: String(row['version']), language: String(row['language']), slots },
+      {
+        name: String(row['name']),
+        version: String(row['version']),
+        language: String(row['language']),
+        slots,
+        dpsCardId: row['dps_card_id'] === null ? null : String(row['dps_card_id']),
+      },
       new Date(String(row['created_at'])),
       new Date(String(row['updated_at'])),
     );

@@ -88,8 +88,11 @@ describe('API catalogue', () => {
         name: 'Test',
         version: '1.10',
         slots: [{ cardId: FIRE_SPIRIT, talentSlot: 1 }],
+        dpsCardId: FIRE_SPIRIT,
       });
       assert.equal(created.statusCode, 201);
+      assert.equal(created.json().dpsCardId, FIRE_SPIRIT);
+      assert.equal((await get(`/api/decks/${created.json().id}`)).json().dpsCardId, FIRE_SPIRIT);
       const { id } = created.json();
 
       const updated = await send('PUT', `/api/decks/${id}`, {
@@ -119,11 +122,13 @@ describe('API catalogue', () => {
         version: '1.10',
         slots: [{ cardId: FIRE_SPIRIT, talentSlot: 1 }],
         turns: 3,
+        dpsCardId: FIRE_SPIRIT,
       });
       assert.equal(response.statusCode, 200);
       const analysis = response.json();
       assert.ok(analysis.damagePerTurn.fire > 0);
       assert.equal(analysis.turns.length, 3);
+      assert.equal(analysis.dpsCardId, FIRE_SPIRIT);
       assert.ok(analysis.averageResistances.fire !== undefined);
     });
   });

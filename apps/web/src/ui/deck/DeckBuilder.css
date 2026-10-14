@@ -91,6 +91,22 @@
   width: 100%;
 }
 
+.deck-slot[data-dps] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.deck-slot__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.deck-slot__buttons button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
 .deck-slot__talent-effect {
   margin: 0;
   color: var(--text-muted);
@@ -204,10 +220,21 @@
   font-size: 0.8rem;
 }
 
-.deck-analysis__cards li {
+.deck-analysis__card-line {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.deck-analysis__dps {
+  color: var(--accent);
+  font-family: var(--font-display);
+}
+
+.deck-analysis__boosts {
+  margin: 0.1rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
 }
 
 .deck-analysis__notes li {

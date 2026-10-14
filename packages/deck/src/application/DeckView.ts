@@ -7,6 +7,7 @@ export interface DeckView {
   readonly version: string;
   readonly language: string;
   readonly slots: readonly DeckSlot[];
+  readonly dpsCardId: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -18,6 +19,7 @@ export function toDeckView(deck: Deck): DeckView {
     version: deck.version,
     language: deck.language,
     slots: deck.slots,
+    dpsCardId: deck.dpsCardId,
     createdAt: deck.createdAt.toISOString(),
     updatedAt: deck.updatedAt.toISOString(),
   };

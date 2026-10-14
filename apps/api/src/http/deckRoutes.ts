@@ -14,19 +14,26 @@ const slotsSchema = {
 const deckBody = {
   type: 'object',
   required: ['name', 'version', 'slots'],
-  properties: { name: { type: 'string' }, version: { type: 'string' }, slots: slotsSchema },
+  properties: {
+    name: { type: 'string' },
+    version: { type: 'string' },
+    slots: slotsSchema,
+    dpsCardId: { type: ['string', 'null'] },
+  },
 } as const;
 
 interface DeckBody {
   name: string;
   version: string;
   slots: { cardId: string; talentSlot: number }[];
+  dpsCardId?: string | null;
 }
 
 interface AnalysisBody {
   version: string;
   slots: { cardId: string; talentSlot: number }[];
   turns?: number;
+  dpsCardId?: string | null;
 }
 
 /**
@@ -64,6 +71,7 @@ export async function deckRoutes(app: FastifyInstance, { container }: { containe
             version: { type: 'string' },
             slots: slotsSchema,
             turns: { type: 'integer', minimum: 1, maximum: 50 },
+            dpsCardId: { type: ['string', 'null'] },
           },
         },
       },

@@ -1,4 +1,4 @@
-import type { ElementAmounts } from '../../domain/Deck.ts';
+import type { DeckAnalysis, ElementAmounts } from '../../domain/Deck.ts';
 import { useCardEnvironment } from '../card/CardEnvironment.tsx';
 import type { AnalysisState } from './DeckBuilderPage.tsx';
 
@@ -12,8 +12,9 @@ interface DeckAnalysisViewProps {
 }
 
 /**
- * Analyse du deck, élément par élément : résistances moyennes (faiblesses en évidence),
- * dégâts et soins par tour, éléments générés et consommés, puis projection des bonus cumulés.
+ * Analyse du deck : simulation tour par tour en espérance. Élément par élément : résistances
+ * moyennes (faiblesses en évidence), dégâts et soins moyens par tour, éléments générés et consommés ;
+ * puis détail par carte (renforts cumulés) et par tour (stock de bonus).
  */
 export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisViewProps) {
   const { catalog, assetUrl } = useCardEnvironment();
@@ -47,6 +48,8 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
       ].some((amounts) => amounts[id] !== undefined),
     );
   const weak = new Set(analysis.weaknesses);
+  const first = analysis.turns[0];
+  const last = analysis.turns.at(-1);
   const cell = (amounts: ElementAmounts, id: string) => {
     const value = amounts[id];
     return value === undefined || value === 0 ? '–' : number.format(value);
@@ -56,14 +59,21 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
     <section className="deck-analysis" aria-label="Analyse du deck">
       <h3>Analyse</h3>
       <p className="deck-analysis__summary">
-        <strong>{number.format(analysis.totalDamagePerTurn)}</strong> dégâts par tour sans bonus ·{' '}
-        <strong>{number.format(analysis.averageTotalDamagePerTurn)}</strong> en moyenne sur {analysis.turns.length} tours,
-        bonus cumulés compris
-        {analysis.averageTotalHealPerTurn > 0 && (
+        <strong>{number.format(analysis.totalDamagePerTurn)}</strong> dégâts par tour en moyenne sur{' '}
+        {analysis.turns.length} tours
+        {first && last && (
           <>
-            {' '}· <strong>{number.format(analysis.averageTotalHealPerTurn)}</strong> soins par tour
+            {' '}
+            (de {number.format(first.totalDamage)} au tour 1 à {number.format(last.totalDamage)} au tour {last.turn})
           </>
         )}
+        {analysis.totalHealPerTurn > 0 && (
+          <>
+            {' '}· <strong>{number.format(analysis.totalHealPerTurn)}</strong> soins par tour
+          </>
+        )}
+        . Précision, critique, bonus cumulés et renforts compris
+        {analysis.dpsCardId === null ? ' (aucun DPS choisi pour les renforts ciblés).' : '.'}
       </p>
 
       <div className="deck-analysis__scroll">
@@ -74,16 +84,13 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
               <th scope="col" title="Résistance moyenne des cartes (%), talents et bonus d'équipe compris">
                 Rés.
               </th>
-              <th scope="col" title="Dégâts par tour, sans bonus élémentaires">
+              <th scope="col" title={`Dégâts par tour en moyenne sur ${analysis.turns.length} tours, tout compris`}>
                 Dégâts
               </th>
-              <th scope="col" title={`Dégâts par tour en moyenne sur ${analysis.turns.length} tours, bonus cumulés compris`}>
-                + bonus
-              </th>
-              <th scope="col" title={`Soins par tour en moyenne sur ${analysis.turns.length} tours, bonus cumulés compris`}>
+              <th scope="col" title={`Soins par tour en moyenne sur ${analysis.turns.length} tours, tout compris`}>
                 Soins
               </th>
-              <th scope="col" title="Éléments générés par tour">
+              <th scope="col" title="Éléments générés par tour, en moyenne">
                 Gén.
               </th>
               <th scope="col" title="Éléments consommés par tour (coûts)">
@@ -108,8 +115,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
                     {analysis.averageResistances[id] !== undefined && ' %'}
                   </td>
                   <td>{cell(analysis.damagePerTurn, id)}</td>
-                  <td>{cell(analysis.averageDamagePerTurn, id)}</td>
-                  <td>{cell(analysis.averageHealPerTurn, id)}</td>
+                  <td>{cell(analysis.healPerTurn, id)}</td>
                   <td>{cell(analysis.generatedPerTurn, id)}</td>
                   <td>{cell(analysis.consumedPerTurn, id)}</td>
                   <td>{cell(analysis.startingBonus, id)}</td>
@@ -131,18 +137,25 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
       <ul className="deck-analysis__cards">
         {analysis.cards.map((card) => (
           <li key={card.cardId}>
-            <span>
-              {card.cardName} <span className="deck-analysis__muted">· {card.talentName}</span>
-            </span>
-            <span>
-              {number.format(card.damagePerTurn)} dégâts · {number.format(card.generatedPerTurn)} éléments / tour
-            </span>
+            <div className="deck-analysis__card-line">
+              <span>
+                {card.cardName}
+                {card.isDps && <span className="deck-analysis__dps"> DPS</span>}{' '}
+                <span className="deck-analysis__muted">· {card.talentName}</span>
+              </span>
+              <span>
+                {number.format(card.damagePerTurn)} dégâts
+                {card.healPerTurn > 0 && <> · {number.format(card.healPerTurn)} soins</>} ·{' '}
+                {number.format(card.generatedPerTurn)} éléments / tour
+              </span>
+            </div>
+            <BoostsLine boosts={card.finalBoosts} turn={last?.turn ?? 0} />
           </li>
         ))}
       </ul>
 
       <h4>
-        Projection des bonus cumulés
+        Tour par tour
         <label className="deck-analysis__turns">
           sur
           <input
@@ -156,8 +169,8 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
         </label>
       </h4>
       <p className="deck-analysis__muted">
-        Chaque point de bonus d'un élément ajoute 10 % aux dégâts et soins de cet élément ; le stock gagne les éléments
-        générés et perd ceux consommés à chaque tour.
+        Chaque point de bonus d'un élément ajoute 10 % aux dégâts et soins de cet élément. Le stock gagne les éléments
+        générés (dès le tour où ils le sont) et perd ceux consommés.
       </p>
       <div className="deck-analysis__scroll">
         <table className="deck-analysis__table deck-analysis__table--turns">
@@ -209,3 +222,24 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
     </section>
   );
 }
+
+const BOOST_LABELS: readonly [keyof DeckAnalysis['cards'][number]['finalBoosts'], string, string][] = [
+  ['precision', 'précision', ' %'],
+  ['critChance', 'critique', ' %'],
+  ['critMultiplier', 'multiplicateur de critique', ''],
+  ['baseDamage', 'dégâts de base', ''],
+  ['baseHeal', 'soins de base', ''],
+];
+
+/** Renforts cumulés d'une carte à la fin de la simulation (rien si aucun). */
+function BoostsLine({ boosts, turn }: { boosts: DeckAnalysis['cards'][number]['finalBoosts']; turn: number }) {
+  const parts = BOOST_LABELS.filter(([stat]) => boosts[stat] !== 0).map(
+    ([stat, label, unit]) => `${boosts[stat] > 0 ? '+' : ''}${number.format(boosts[stat])}${unit} ${label}`,
+  );
+  return parts.length === 0 ? null : (
+    <p className="deck-analysis__boosts">
+      Renforts au tour {turn} : {parts.join(' · ')}
+    </p>
+  );
+}
+

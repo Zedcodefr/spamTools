@@ -23,8 +23,8 @@ export class HttpDeckGateway implements DeckGateway {
     await this.request('DELETE', `/decks/${encodeURIComponent(id)}`);
   }
 
-  analyze(version: string, slots: readonly DeckSlot[], turns: number): Promise<DeckAnalysis> {
-    return this.request('POST', '/decks/analysis', { version, slots, turns });
+  analyze(version: string, slots: readonly DeckSlot[], turns: number, dpsCardId: string | null): Promise<DeckAnalysis> {
+    return this.request('POST', '/decks/analysis', { version, slots, turns, dpsCardId });
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {

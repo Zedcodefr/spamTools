@@ -111,17 +111,19 @@ et images dans `assets/`), ou dans le dossier indiqué par `SPAMTOOLS_DATA_DIR`.
 ## Deck builder (`/deck`)
 
 Clic gauche sur une carte de la galerie : l'ajouter au deck (4 cartes, sans doublon) ou l'en retirer ;
-un talent par carte. L'analyse est une **espérance par tour**, les 4 cartes agissant à chaque tour :
+un talent par carte, et un **DPS** facultatif. L'analyse **simule la partie tour par tour, en espérance**,
+les 4 cartes agissant à chaque tour :
 
 - capacité de recharge N : utilisée une fois tous les N tours (Écho : chance de rester disponible) ;
-- dégâts et soins : moyenne min/max × précision × espérance de critique ; attaque de zone × 4 cibles ;
-  « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
-- éléments générés (bonus des capacités, Cœurs naturels) et consommés (coûts), bonus de départ (talents) ;
-- bonus cumulés : le stock de chaque élément gagne les générés et perd les consommés à chaque tour ;
-  chaque point ajoute +10 % aux dégâts et soins de cet élément (×2 avec Multiplicateur) — projection
-  tour par tour et moyenne sur l'horizon choisi ;
+- dégâts, soins et bonus élémentaires : × précision × (1 + chance de critique × (multiplicateur − 1)) ;
+  attaque de zone × 4 cibles ; « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
+- bonus élémentaires : le stock de chaque élément gagne les générés (dès le tour où ils le sont) et perd les
+  consommés (coûts) ; chaque point ajoute +10 % aux dégâts et soins de cet élément (×2 avec Multiplicateur) ;
+- croissances : « la valeur de base augmente de N » (dégâts, soins ou bonus de la capacité, à chaque utilisation) ;
+- renforts de précision, critique, multiplicateur de critique et dégâts/soins de base : au lanceur, à toutes
+  les alliées, au **DPS choisi** (renforts ciblés ; non comptés sans DPS) ou ¼ à chaque alliée (« au hasard ») ;
+  précision et critique plafonnées à 100 % ; talents « à chaque tour » appliqués à chaque tour ;
 - résistances moyennes des 4 cartes, talents permanents et bonus d'équipe compris ; faiblesse = la plus basse.
 
 Les effets conditionnels, à usage limité ou en pourcentage de PV sont listés « non chiffrés ».
-Les statistiques par carte sont calculées à l'import (`computeCardStats`), l'analyse ne fait que les combiner.
-
+Le modèle de chaque capacité est calculé à l'import (`computeCardStats`) ; l'analyse (`analyzeDeck`) simule.

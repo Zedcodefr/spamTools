@@ -8,8 +8,14 @@ import type { DeckCardStatsProvider } from './ports/index.js';
 import { SaveDeck } from './SaveDeck.js';
 
 const empty: StatContribution = {
-  resistances: { fire: 10 }, allyResistances: {}, damagePerTurn: { fire: 10 }, healPerTurn: {}, generatedPerTurn: {},
-  consumedPerTurn: {}, startingBonus: {}, unquantified: [],
+  resistances: { fire: 10 }, allyResistances: {}, passiveBonusPerTurn: {}, startingBonus: {}, startingBoosts: [],
+  boostsPerTurn: [], unquantified: [],
+  abilities: [
+    {
+      name: 'Attaque', period: 1, precision: 100, critChance: 0, critMultiplier: 2, heal: [], bonus: [], cost: {}, boosts: [],
+      damage: [{ value: 10, elements: { fire: 1 }, targets: 1, weight: 1 }], growth: { damage: 0, heal: 0, bonus: 0 },
+    },
+  ],
 };
 
 /** Catalogue simulé : cartes c1 à c5, talents 1 à 3. */
@@ -19,7 +25,7 @@ const provider: DeckCardStatsProvider = {
       if (!/^c[1-5]$/.test(slot.cardId) || slot.talentSlot > 3) {
         throw new NotFoundError(`Carte ou talent introuvable : ${slot.cardId}/${slot.talentSlot}`);
       }
-      const talent = { ...empty, resistances: {}, damagePerTurn: {} };
+      const talent = { ...empty, resistances: {}, abilities: [] };
       return { cardId: slot.cardId, cardName: slot.cardId, talentName: 't', base: empty, talent, bonusFactor: 1 };
     });
   },

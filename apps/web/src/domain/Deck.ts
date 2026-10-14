@@ -14,6 +14,7 @@ export interface DeckView {
   readonly version: string;
   readonly language: string;
   readonly slots: readonly DeckSlot[];
+  readonly dpsCardId: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -23,9 +24,11 @@ export interface DeckDraft {
   readonly id: string | null;
   readonly name: string;
   readonly slots: readonly DeckSlot[];
+  /** Carte qui reçoit les renforts ciblés des autres (facultatif). */
+  readonly dpsCardId: string | null;
 }
 
-export const EMPTY_DRAFT: DeckDraft = { id: null, name: '', slots: [] };
+export const EMPTY_DRAFT: DeckDraft = { id: null, name: '', slots: [], dpsCardId: null };
 
 export const DEFAULT_TALENT_SLOT = 1;
 
@@ -41,7 +44,19 @@ export function toggleCard(draft: DeckDraft, cardId: string): DeckDraft {
 }
 
 export function removeCard(draft: DeckDraft, cardId: string): DeckDraft {
-  return { ...draft, slots: draft.slots.filter((slot) => slot.cardId !== cardId) };
+  return {
+    ...draft,
+    slots: draft.slots.filter((slot) => slot.cardId !== cardId),
+    dpsCardId: draft.dpsCardId === cardId ? null : draft.dpsCardId,
+  };
+}
+
+/** Désigne la carte comme DPS, ou retire ce rôle si elle l'a déjà. */
+export function toggleDps(draft: DeckDraft, cardId: string): DeckDraft {
+  if (!draft.slots.some((slot) => slot.cardId === cardId)) {
+    return draft;
+  }
+  return { ...draft, dpsCardId: draft.dpsCardId === cardId ? null : cardId };
 }
 
 export function setTalent(draft: DeckDraft, cardId: string, talentSlot: number): DeckDraft {
@@ -59,6 +74,7 @@ export type ElementAmounts = Readonly<Record<string, number>>;
 
 export interface TurnProjection {
   readonly turn: number;
+  /** Stock de bonus élémentaires pendant ce tour (générés ce tour compris). */
   readonly bonusStock: ElementAmounts;
   readonly damage: ElementAmounts;
   readonly heal: ElementAmounts;
@@ -66,31 +82,40 @@ export interface TurnProjection {
   readonly totalHeal: number;
 }
 
-/** Analyse d'un deck (POST /api/decks/analysis) : espérances par tour. */
+/** Renforts cumulés d'une carte : points de précision et de critique, multiplicateur, valeurs de base. */
+export interface CardBoosts {
+  readonly precision: number;
+  readonly critChance: number;
+  readonly critMultiplier: number;
+  readonly baseDamage: number;
+  readonly baseHeal: number;
+}
+
+/** Analyse d'un deck (POST /api/decks/analysis) : simulation tour par tour, en espérance. */
 export interface DeckAnalysis {
   readonly cardCount: number;
+  readonly dpsCardId: string | null;
   readonly averageResistances: ElementAmounts;
   readonly weaknesses: readonly string[];
+  /** Moyennes par tour sur la simulation, tout compris. */
   readonly damagePerTurn: ElementAmounts;
   readonly totalDamagePerTurn: number;
   readonly healPerTurn: ElementAmounts;
   readonly totalHealPerTurn: number;
-  readonly turns: readonly TurnProjection[];
-  readonly averageDamagePerTurn: ElementAmounts;
-  readonly averageTotalDamagePerTurn: number;
-  readonly averageHealPerTurn: ElementAmounts;
-  readonly averageTotalHealPerTurn: number;
   readonly generatedPerTurn: ElementAmounts;
   readonly consumedPerTurn: ElementAmounts;
-  readonly netPerTurn: ElementAmounts;
   readonly startingBonus: ElementAmounts;
+  readonly turns: readonly TurnProjection[];
   readonly cards: readonly {
     readonly cardId: string;
     readonly cardName: string;
     readonly talentName: string;
+    readonly isDps: boolean;
     readonly resistances: ElementAmounts;
     readonly damagePerTurn: number;
+    readonly healPerTurn: number;
     readonly generatedPerTurn: number;
+    readonly finalBoosts: CardBoosts;
   }[];
   readonly unquantified: readonly { readonly cardName: string; readonly source: string; readonly reason: string }[];
 }

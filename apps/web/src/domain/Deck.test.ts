@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { EMPTY_DRAFT, isFull, removeCard, setTalent, toggleCard } from './Deck.ts';
+import { EMPTY_DRAFT, isFull, removeCard, setTalent, toggleCard, toggleDps } from './Deck.ts';
 
 const ids = (draft: typeof EMPTY_DRAFT) => draft.slots.map((slot) => slot.cardId);
 
@@ -15,6 +15,14 @@ describe('composition de deck', () => {
     const full = ['a', 'b', 'c', 'd'].reduce(toggleCard, EMPTY_DRAFT);
     assert.equal(isFull(full), true);
     assert.deepEqual(ids(toggleCard(full, 'e')), ['a', 'b', 'c', 'd']);
+  });
+
+  it('désigne un DPS parmi les cartes du deck, et le libère si la carte est retirée', () => {
+    const draft = toggleDps(['a', 'b'].reduce(toggleCard, EMPTY_DRAFT), 'b');
+    assert.equal(draft.dpsCardId, 'b');
+    assert.equal(toggleDps(draft, 'b').dpsCardId, null);
+    assert.equal(toggleDps(draft, 'z').dpsCardId, 'b');
+    assert.equal(removeCard(draft, 'b').dpsCardId, null);
   });
 
   it('change le talent ou retire une carte précise', () => {

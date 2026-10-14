@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DomainError } from '@spamtools/shared-kernel';
-import { analyzeDeck, type DeckCardStats, type StatContribution } from './DeckAnalysis.js';
+import { analyzeDeck, type AbilityModel, type Boost, type DeckCardStats, type StatContribution } from './DeckAnalysis.js';
 import { Deck } from './Deck.js';
 
 const NOW = new Date('2026-10-14T12:00:00Z');
@@ -20,6 +20,13 @@ describe('Deck', () => {
     assert.throws(() => Deck.create({ ...content([]), name: '  ' }, NOW), /nom/);
   });
 
+  it('accepte un DPS parmi ses cartes, et le refuse sinon', () => {
+    const slots = [{ cardId: 'c1', talentSlot: 1 }];
+    assert.equal(Deck.create({ ...content(slots), dpsCardId: 'c1' }, NOW).dpsCardId, 'c1');
+    assert.equal(Deck.create(content(slots), NOW).dpsCardId, null);
+    assert.throws(() => Deck.create({ ...content(slots), dpsCardId: 'c9' }, NOW), /DPS/);
+  });
+
   it('met à jour son contenu et sa date de modification', () => {
     const deck = Deck.create(content([]), NOW);
     const later = new Date('2026-10-15T12:00:00Z');
@@ -31,9 +38,16 @@ describe('Deck', () => {
 });
 
 const empty: StatContribution = {
-  resistances: {}, allyResistances: {}, damagePerTurn: {}, healPerTurn: {}, generatedPerTurn: {}, consumedPerTurn: {},
-  startingBonus: {}, unquantified: [],
+  resistances: {}, allyResistances: {}, abilities: [], passiveBonusPerTurn: {}, startingBonus: {}, startingBoosts: [],
+  boostsPerTurn: [], unquantified: [],
 };
+
+const line = (value: number, element = 'fire', targets = 1) => ({ value, elements: { [element]: 1 }, targets, weight: 1 });
+
+const ability = (overrides: Partial<AbilityModel>): AbilityModel => ({
+  name: 'Capacité', period: 1, precision: 100, critChance: 0, critMultiplier: 2, damage: [], heal: [], bonus: [], cost: {},
+  growth: { damage: 0, heal: 0, bonus: 0 }, boosts: [], ...overrides,
+});
 
 const cardStats = (
   cardId: string,
@@ -44,7 +58,10 @@ const cardStats = (
   cardId, cardName: cardId, talentName: `${cardId}-talent`, base: { ...empty, ...base }, talent: { ...empty, ...talent }, bonusFactor,
 });
 
-describe('analyzeDeck', () => {
+const damageByTurn = (cards: DeckCardStats[], turns: number, dpsCardId?: string) =>
+  analyzeDeck(cards, { turns, dpsCardId }).turns.map((turn) => turn.totalDamage);
+
+describe('analyzeDeck : résistances', () => {
   it('moyenne les résistances, talents et bonus d’équipe compris, et désigne les faiblesses', () => {
     const analysis = analyzeDeck([
       cardStats('a', { resistances: { fire: 10, water: 0 } }, { resistances: { water: 20 } }),
@@ -54,47 +71,96 @@ describe('analyzeDeck', () => {
     assert.deepEqual(analysis.averageResistances, { fire: 30, water: 15 });
     assert.deepEqual(analysis.weaknesses, ['water']);
   });
+});
 
-  it('additionne dégâts, soins et éléments par tour', () => {
-    const analysis = analyzeDeck([
-      cardStats('a', { damagePerTurn: { fire: 10 }, generatedPerTurn: { fire: 1 }, unquantified: [{ source: 'x', reason: 'y' }] }),
-      cardStats('b', { damagePerTurn: { fire: 5, water: 4 }, healPerTurn: { light: 6 }, consumedPerTurn: { fire: 0.5 } }),
-    ]);
-    assert.deepEqual(analysis.damagePerTurn, { fire: 15, water: 4 });
-    assert.equal(analysis.totalDamagePerTurn, 19);
-    assert.deepEqual(analysis.healPerTurn, { light: 6 });
-    assert.deepEqual(analysis.netPerTurn, { fire: 0.5 });
-    assert.deepEqual(analysis.unquantified, [{ cardName: 'a', source: 'x', reason: 'y' }]);
+describe('analyzeDeck : simulation', () => {
+  it('applique précision, critique (multiplicateur) et recharge', () => {
+    const cards = [
+      cardStats('a', { abilities: [ability({ damage: [line(10)], precision: 50, critChance: 50, critMultiplier: 3 })] }),
+      cardStats('b', { abilities: [ability({ damage: [line(20, 'water')], period: 2 })] }),
+    ];
+    // a : 10 × 0,5 × (1 + 0,5 × 2) = 10 ; b : 20 / 2 = 10
+    const analysis = analyzeDeck(cards, { turns: 2 });
+    assert.deepEqual(analysis.damagePerTurn, { fire: 10, water: 10 });
+    assert.equal(analysis.totalDamagePerTurn, 20);
   });
 
-  it('cumule les bonus tour après tour : +10 % de dégâts et soins par point', () => {
-    const analysis = analyzeDeck(
-      [cardStats('a', { damagePerTurn: { fire: 10 }, healPerTurn: { fire: 10 }, generatedPerTurn: { fire: 2 } }, { startingBonus: { fire: 1 } })],
-      3,
-    );
-    // Stock de feu : 1 au tour 1, puis +2 par tour -> 1, 3, 5.
-    assert.deepEqual(analysis.turns.map((turn) => turn.bonusStock['fire']), [1, 3, 5]);
-    assert.deepEqual(analysis.turns.map((turn) => turn.totalDamage), [11, 13, 15]);
-    assert.deepEqual(analysis.turns.map((turn) => turn.totalHeal), [11, 13, 15]);
-    assert.equal(analysis.averageTotalDamagePerTurn, 13);
+  it('compte un bonus généré dès le tour où il est généré : +10 % par point', () => {
+    const cards = [cardStats('a', { abilities: [ability({ damage: [line(10)], bonus: [line(2)] })] })];
+    const analysis = analyzeDeck(cards, { turns: 3 });
+    assert.deepEqual(analysis.turns.map((turn) => turn.bonusStock['fire']), [2, 4, 6]);
+    assert.deepEqual(analysis.turns.map((turn) => turn.totalDamage), [12, 14, 16]);
   });
 
-  it('retire les éléments consommés du stock, sans descendre sous zéro', () => {
-    const analysis = analyzeDeck(
-      [cardStats('a', { damagePerTurn: { fire: 10 }, generatedPerTurn: { fire: 1 }, consumedPerTurn: { fire: 3 } }, { startingBonus: { fire: 3 } })],
-      4,
-    );
-    assert.deepEqual(analysis.turns.map((turn) => turn.bonusStock['fire']), [3, 1, 0, 0]);
+  it('fait grandir un bonus à chaque utilisation : +1, +2, +3…', () => {
+    const cards = [cardStats('a', { abilities: [ability({ bonus: [line(1, 'shadow')], growth: { damage: 0, heal: 0, bonus: 1 } })] })];
+    assert.deepEqual(analyzeDeck(cards, { turns: 3 }).turns.map((turn) => turn.bonusStock['shadow']), [1, 3, 6]);
+  });
+
+  it('fait grandir les dégâts d’une capacité après chaque utilisation', () => {
+    const cards = [cardStats('a', { abilities: [ability({ damage: [line(15, 'earth')], growth: { damage: 5, heal: 0, bonus: 0 } })] })];
+    assert.deepEqual(damageByTurn(cards, 3), [15, 20, 25]);
+  });
+
+  it('cumule les renforts du lanceur dès le tour où ils sont lancés', () => {
+    const critBoost: Boost = { stat: 'critChance', amount: 10, target: 'self', chance: 1 };
+    const cards = [cardStats('a', { abilities: [ability({ damage: [line(10)], boosts: [critBoost] })] })];
+    // critique 10 %, puis 20 % : 10 × 1,1 ; 10 × 1,2
+    assert.deepEqual(damageByTurn(cards, 2), [11, 12]);
+  });
+
+  it('applique les renforts ciblés au DPS choisi, et les signale sans DPS', () => {
+    const precision: Boost = { stat: 'precision', amount: 50, target: 'dps', chance: 1 };
+    const critRatio: Boost = { stat: 'critMultiplier', amount: 1, target: 'dps', chance: 1 };
+    const cards = [
+      cardStats('support', { abilities: [ability({ name: 'Visée', boosts: [precision, critRatio] })] }),
+      cardStats('dps', { abilities: [ability({ damage: [line(10)], precision: 50, critChance: 50 })] }),
+    ];
+    // Avec DPS : précision 100 %, critique ×3 -> 10 × 1 × (1 + 0,5 × 2) = 20 ; sans : 10 × 0,5 × 1,5 = 7,5
+    assert.deepEqual(damageByTurn(cards, 1, 'dps'), [20]);
+    const withoutDps = analyzeDeck(cards, { turns: 1 });
+    assert.equal(withoutDps.totalDamagePerTurn, 7.5);
+    assert.deepEqual(withoutDps.unquantified.map((note) => `${note.cardName} · ${note.source}`), ['support · Visée']);
+    assert.equal(analyzeDeck(cards, { turns: 1, dpsCardId: 'dps' }).cards[1]?.finalBoosts.precision, 50);
+  });
+
+  it('répartit un renfort « carte alliée au hasard » sur toutes les cartes', () => {
+    const boost: Boost = { stat: 'baseDamage', amount: 8, target: 'randomAlly', chance: 1 };
+    const cards = [
+      cardStats('a', { abilities: [ability({ boosts: [boost] })] }),
+      cardStats('b', { abilities: [ability({ damage: [line(10)] })] }),
+    ];
+    // +8 / 2 cartes = +4 de dégâts de base pour b
+    assert.deepEqual(damageByTurn(cards, 1), [14]);
+  });
+
+  it('retire les coûts du stock, sans descendre sous zéro', () => {
+    const cards = [
+      cardStats('a', { abilities: [ability({ bonus: [line(1)], cost: { fire: 3 } })] }, { startingBonus: { fire: 3 } }),
+    ];
+    assert.deepEqual(analyzeDeck(cards, { turns: 3 }).turns.map((turn) => turn.bonusStock['fire'] ?? 0), [1, 0, 0]);
   });
 
   it('double l’effet des bonus pour une carte avec Multiplicateur', () => {
-    const analysis = analyzeDeck(
-      [
-        cardStats('a', { damagePerTurn: { fire: 10 } }, { startingBonus: { fire: 5 } }, 2),
-        cardStats('b', { damagePerTurn: { fire: 10 } }),
-      ],
-      1,
-    );
-    assert.equal(analysis.turns[0]?.totalDamage, 10 * 2 + 10 * 1.5);
+    const cards = [
+      cardStats('a', { abilities: [ability({ damage: [line(10)] })] }, { startingBonus: { fire: 5 } }, 2),
+      cardStats('b', { abilities: [ability({ damage: [line(10)] })] }),
+    ];
+    assert.deepEqual(damageByTurn(cards, 1), [10 * 2 + 10 * 1.5]);
+  });
+
+  it('applique les renforts de talent au départ et à chaque tour', () => {
+    const cards = [
+      cardStats(
+        'a',
+        { abilities: [ability({ damage: [line(10)] })] },
+        {
+          startingBoosts: [{ stat: 'critChance', amount: 10, target: 'self', chance: 1 }],
+          boostsPerTurn: [{ stat: 'critChance', amount: 10, target: 'allies', chance: 1 }],
+        },
+      ),
+    ];
+    // critique 20 %, puis 30 %
+    assert.deepEqual(damageByTurn(cards, 2), [12, 13]);
   });
 });

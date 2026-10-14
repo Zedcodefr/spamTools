@@ -249,4 +249,14 @@ export const migrations: readonly SqlMigration[] = [
       );
     `,
   },
+  {
+    version: 6,
+    name: 'add_deck_dps',
+    sql: `
+      -- Carte qui reçoit les renforts ciblés (précision, critique, dégâts de base). Facultative.
+      ALTER TABLE deck ADD COLUMN dps_card_id TEXT;
+      -- Le modèle des cartes change (simulation des renforts) : à recalculer à la prochaine synchro.
+      UPDATE catalog SET analysis_version = NULL;
+    `,
+  },
 ];

@@ -5,6 +5,7 @@ export interface DeckToSave {
   readonly name: string;
   readonly version: string;
   readonly slots: readonly DeckSlot[];
+  readonly dpsCardId: string | null;
 }
 
 /**
@@ -14,5 +15,5 @@ export interface DeckGateway {
   list(): Promise<readonly DeckView[]>;
   save(deck: DeckToSave): Promise<DeckView>;
   delete(id: string): Promise<void>;
-  analyze(version: string, slots: readonly DeckSlot[], turns: number): Promise<DeckAnalysis>;
+  analyze(version: string, slots: readonly DeckSlot[], turns: number, dpsCardId: string | null): Promise<DeckAnalysis>;
 }

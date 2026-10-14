@@ -1,35 +1,66 @@
 /**
- * Analyse d'un deck à partir des statistiques chiffrées de ses cartes (calculées à l'import).
- * Toutes les valeurs sont des espérances ; « par tour » suppose que les 4 cartes agissent
- * et utilisent chaque capacité dès qu'elle est prête.
+ * Analyse d'un deck : simulation tour par tour, en espérance, à partir du modèle chiffré de
+ * chaque carte (calculé à l'import). Les 4 cartes agissent à chaque tour et utilisent chaque
+ * capacité dès qu'elle est prête : une capacité de période P sert en moyenne 1 / P fois par tour.
  *
- * Bonus élémentaires : chaque élément a un stock, qui part des bonus de départ puis gagne à
- * chaque tour les éléments générés et perd ceux consommés (jamais sous 0). Chaque point de
- * stock d'un élément augmente de BONUS_RATE les dégâts et soins de cet élément ; un élément
- * généré au tour t profite à partir du tour t + 1.
+ * À chaque tour, dans l'ordre :
+ * 1. renforts « à chaque tour » des talents, puis renforts des capacités utilisées ce tour ;
+ * 2. éléments générés (précision et critique compris) et consommés : le stock compte dès ce tour ;
+ * 3. dégâts et soins : précision, critique, dégâts de base et croissance des capacités accumulés,
+ *    majorés de BONUS_RATE par point de stock de leur élément (×2 avec Multiplicateur).
  */
 
 /** +10 % de dégâts et de soins par point de bonus élémentaire accumulé. */
 export const BONUS_RATE = 0.1;
-/** Horizon de projection par défaut (tours). */
+/** Horizon de simulation par défaut (tours). */
 export const DEFAULT_TURNS = 10;
 export const MAX_TURNS = 50;
 
 export type ElementAmounts = Readonly<Record<string, number>>;
 
-/** Apport d'une carte ou d'un talent (même forme que les stats du catalogue). */
+export interface EffectLine {
+  readonly value: number;
+  readonly elements: ElementAmounts;
+  readonly targets: number;
+  readonly weight: number;
+}
+
+export type BoostStat = 'precision' | 'critChance' | 'critMultiplier' | 'baseDamage' | 'baseHeal';
+
+export interface Boost {
+  readonly stat: BoostStat;
+  readonly amount: number;
+  readonly target: 'self' | 'allies' | 'dps' | 'randomAlly';
+  readonly chance: number;
+}
+
+export interface AbilityModel {
+  readonly name: string;
+  readonly period: number;
+  readonly precision: number;
+  readonly critChance: number;
+  readonly critMultiplier: number;
+  readonly damage: readonly EffectLine[];
+  readonly heal: readonly EffectLine[];
+  readonly bonus: readonly EffectLine[];
+  readonly cost: ElementAmounts;
+  readonly growth: { readonly damage: number; readonly heal: number; readonly bonus: number };
+  readonly boosts: readonly Boost[];
+}
+
+/** Apport d'une carte ou d'un talent (même forme que le modèle du catalogue). */
 export interface StatContribution {
   readonly resistances: ElementAmounts;
   readonly allyResistances: ElementAmounts;
-  readonly damagePerTurn: ElementAmounts;
-  readonly healPerTurn: ElementAmounts;
-  readonly generatedPerTurn: ElementAmounts;
-  readonly consumedPerTurn: ElementAmounts;
+  readonly abilities: readonly AbilityModel[];
+  readonly passiveBonusPerTurn: ElementAmounts;
   readonly startingBonus: ElementAmounts;
+  readonly startingBoosts: readonly Boost[];
+  readonly boostsPerTurn: readonly Boost[];
   readonly unquantified: readonly { readonly source: string; readonly reason: string }[];
 }
 
-/** Une carte du deck : ses stats et celles du talent choisi. */
+/** Une carte du deck : son modèle et celui du talent choisi. */
 export interface DeckCardStats {
   readonly cardId: string;
   readonly cardName: string;
@@ -40,10 +71,24 @@ export interface DeckCardStats {
   readonly bonusFactor: number;
 }
 
-/** État d'un tour de la projection. */
+export interface DeckAnalysisOptions {
+  readonly turns?: number | undefined;
+  /** Carte qui reçoit les renforts ciblés (précision, critique, dégâts de base). */
+  readonly dpsCardId?: string | null | undefined;
+}
+
+/** Renforts cumulés d'une carte : points de précision et de critique, multiplicateur, valeurs de base. */
+export interface CardBoosts {
+  readonly precision: number;
+  readonly critChance: number;
+  readonly critMultiplier: number;
+  readonly baseDamage: number;
+  readonly baseHeal: number;
+}
+
 export interface TurnProjection {
   readonly turn: number;
-  /** Stock de bonus élémentaires disponible pendant ce tour. */
+  /** Stock de bonus élémentaires pendant ce tour (générés ce tour compris). */
   readonly bonusStock: ElementAmounts;
   readonly damage: ElementAmounts;
   readonly heal: ElementAmounts;
@@ -55,40 +100,46 @@ export interface DeckCardSummary {
   readonly cardId: string;
   readonly cardName: string;
   readonly talentName: string;
+  readonly isDps: boolean;
   readonly resistances: ElementAmounts;
+  /** Moyennes par tour sur la simulation. */
   readonly damagePerTurn: number;
+  readonly healPerTurn: number;
   readonly generatedPerTurn: number;
+  /** Renforts cumulés au dernier tour simulé. */
+  readonly finalBoosts: CardBoosts;
 }
 
 export interface DeckAnalysis {
   readonly cardCount: number;
+  readonly dpsCardId: string | null;
   /** Résistance moyenne par élément (%), talents et bonus d'équipe compris. */
   readonly averageResistances: ElementAmounts;
   /** Éléments où la résistance moyenne est la plus basse. */
   readonly weaknesses: readonly string[];
-  /** Dégâts par tour sans bonus élémentaires. */
+  /** Moyennes par tour sur la simulation, tout compris. */
   readonly damagePerTurn: ElementAmounts;
   readonly totalDamagePerTurn: number;
-  /** Soins par tour sans bonus élémentaires. */
   readonly healPerTurn: ElementAmounts;
   readonly totalHealPerTurn: number;
-  /** Projection tour par tour, bonus accumulés compris. */
-  readonly turns: readonly TurnProjection[];
-  /** Moyennes sur la projection, bonus accumulés compris. */
-  readonly averageDamagePerTurn: ElementAmounts;
-  readonly averageTotalDamagePerTurn: number;
-  readonly averageHealPerTurn: ElementAmounts;
-  readonly averageTotalHealPerTurn: number;
   readonly generatedPerTurn: ElementAmounts;
   readonly consumedPerTurn: ElementAmounts;
-  /** Généré moins consommé, par tour. */
-  readonly netPerTurn: ElementAmounts;
   readonly startingBonus: ElementAmounts;
+  readonly turns: readonly TurnProjection[];
   readonly cards: readonly DeckCardSummary[];
   readonly unquantified: readonly { readonly cardName: string; readonly source: string; readonly reason: string }[];
 }
 
-export function analyzeDeck(cards: readonly DeckCardStats[], turnCount: number = DEFAULT_TURNS): DeckAnalysis {
+const NO_BOOSTS: CardBoosts = { precision: 0, critChance: 0, critMultiplier: 0, baseDamage: 0, baseHeal: 0 };
+
+export function analyzeDeck(cards: readonly DeckCardStats[], options: DeckAnalysisOptions = {}): DeckAnalysis {
+  const turnCount = Math.min(Math.max(1, Math.floor(options.turns ?? DEFAULT_TURNS)), MAX_TURNS);
+  const dpsIndex = cards.findIndex((card) => card.cardId === options.dpsCardId);
+  const notes = cards.flatMap((card) =>
+    [...card.base.unquantified, ...card.talent.unquantified].map((note) => ({ cardName: card.cardName, ...note })),
+  );
+
+  // Résistances
   const teamResistance = sum(cards.flatMap((card) => [card.base.allyResistances, card.talent.allyResistances]));
   const cardResistances = cards.map((card) => sum([card.base.resistances, card.talent.resistances, teamResistance]));
   const elements = [...new Set(cardResistances.flatMap((resistances) => Object.keys(resistances)))];
@@ -101,78 +152,111 @@ export function analyzeDeck(cards: readonly DeckCardStats[], turnCount: number =
     ),
   );
   const lowest = Math.min(...Object.values(averageResistances));
-  const weaknesses = Object.entries(averageResistances)
-    .filter(([, value]) => value === lowest)
-    .map(([element]) => element);
 
-  const total = (field: keyof Omit<StatContribution, 'unquantified'>) =>
-    sum(cards.flatMap((card) => [card.base[field], card.talent[field]]));
-  const damagePerTurn = total('damagePerTurn');
-  const healPerTurn = total('healPerTurn');
-  const generatedPerTurn = total('generatedPerTurn');
-  const consumedPerTurn = total('consumedPerTurn');
-  const startingBonus = total('startingBonus');
-  const turns = project(cards, startingBonus, generatedPerTurn, consumedPerTurn, turnCount);
-  const averageOf = (field: 'damage' | 'heal') =>
-    scale(sum(turns.map((turn) => turn[field])), 1 / Math.max(1, turns.length));
-  const averageDamagePerTurn = averageOf('damage');
-  const averageHealPerTurn = averageOf('heal');
+  // Simulation
+  const abilities = cards.map((card) => [...card.base.abilities, ...card.talent.abilities]);
+  const boosts: CardBoosts[] = cards.map(() => ({ ...NO_BOOSTS }));
+  const uses = abilities.map((list) => list.map(() => 0));
+  const perCard = cards.map(() => ({ damage: 0, heal: 0, generated: 0 }));
+  const unappliedTargeted = new Set<string>();
 
-  return {
-    cardCount: cards.length,
-    averageResistances,
-    weaknesses: cards.length === 0 ? [] : weaknesses,
-    damagePerTurn: round(damagePerTurn),
-    totalDamagePerTurn: roundValue(totalOf(damagePerTurn)),
-    healPerTurn: round(healPerTurn),
-    totalHealPerTurn: roundValue(totalOf(healPerTurn)),
-    turns,
-    averageDamagePerTurn: round(averageDamagePerTurn),
-    averageTotalDamagePerTurn: roundValue(totalOf(averageDamagePerTurn)),
-    averageHealPerTurn: round(averageHealPerTurn),
-    averageTotalHealPerTurn: roundValue(totalOf(averageHealPerTurn)),
-    generatedPerTurn: round(generatedPerTurn),
-    consumedPerTurn: round(consumedPerTurn),
-    netPerTurn: round(sum([generatedPerTurn, scale(consumedPerTurn, -1)])),
-    startingBonus: round(startingBonus),
-    cards: cards.map((card, index) => ({
-      cardId: card.cardId,
-      cardName: card.cardName,
-      talentName: card.talentName,
-      resistances: round(cardResistances[index] ?? {}),
-      damagePerTurn: roundValue(totalOf(sum([card.base.damagePerTurn, card.talent.damagePerTurn]))),
-      generatedPerTurn: roundValue(totalOf(sum([card.base.generatedPerTurn, card.talent.generatedPerTurn]))),
-    })),
-    unquantified: cards.flatMap((card) =>
-      [...card.base.unquantified, ...card.talent.unquantified].map((note) => ({ cardName: card.cardName, ...note })),
-    ),
+  const applyBoost = (from: number, boost: Boost, rate: number, source: string) => {
+    const amount = boost.amount * boost.chance * rate;
+    const add = (index: number, share: number) => {
+      const current = boosts[index] as CardBoosts;
+      boosts[index] = { ...current, [boost.stat]: current[boost.stat] + amount * share };
+    };
+    if (boost.target === 'self') {
+      add(from, 1);
+    } else if (boost.target === 'allies') {
+      cards.forEach((_, index) => add(index, 1));
+    } else if (boost.target === 'randomAlly') {
+      cards.forEach((_, index) => add(index, 1 / cards.length));
+    } else if (dpsIndex >= 0) {
+      add(dpsIndex, 1);
+    } else {
+      unappliedTargeted.add(`${cards[from]?.cardName}|${source}`);
+    }
   };
-}
+  cards.forEach((card, index) => {
+    for (const boost of [...card.base.startingBoosts, ...card.talent.startingBoosts]) {
+      applyBoost(index, boost, 1, card.talentName);
+    }
+  });
 
-/** Projection tour par tour : stock de bonus, puis dégâts et soins majorés par ce stock. */
-function project(
-  cards: readonly DeckCardStats[],
-  startingBonus: ElementAmounts,
-  generatedPerTurn: ElementAmounts,
-  consumedPerTurn: ElementAmounts,
-  turnCount: number,
-): TurnProjection[] {
+  let stock: Record<string, number> = sum(cards.flatMap((card) => [card.base.startingBonus, card.talent.startingBonus]));
+  const startingBonus = round(stock);
+  const totals: Record<'damage' | 'heal' | 'generated' | 'consumed', Record<string, number>> = {
+    damage: {},
+    heal: {},
+    generated: {},
+    consumed: {},
+  };
   const turns: TurnProjection[] = [];
-  let stock: Record<string, number> = { ...startingBonus };
-  for (let turn = 1; turn <= Math.min(Math.max(1, Math.floor(turnCount)), MAX_TURNS); turn++) {
-    const boosted = (field: 'damagePerTurn' | 'healPerTurn') =>
-      sum(
-        cards.map((card) =>
-          Object.fromEntries(
-            Object.entries(sum([card.base[field], card.talent[field]])).map(([element, value]) => [
-              element,
-              value * (1 + BONUS_RATE * card.bonusFactor * (stock[element] ?? 0)),
-            ]),
-          ),
-        ),
-      );
-    const damage = boosted('damagePerTurn');
-    const heal = boosted('healPerTurn');
+
+  for (let turn = 1; turn <= turnCount; turn++) {
+    // 1. Renforts du tour.
+    cards.forEach((card, index) => {
+      for (const boost of [...card.base.boostsPerTurn, ...card.talent.boostsPerTurn]) {
+        applyBoost(index, boost, 1, card.talentName);
+      }
+      abilities[index]?.forEach((ability) => {
+        for (const boost of ability.boosts) {
+          applyBoost(index, boost, 1 / ability.period, ability.name);
+        }
+      });
+    });
+
+    // 2. Éléments générés et consommés.
+    const generated: Record<string, number> = {};
+    const consumed: Record<string, number> = {};
+    cards.forEach((card, index) => {
+      const byCard = sum([card.base.passiveBonusPerTurn, card.talent.passiveBonusPerTurn]);
+      abilities[index]?.forEach((ability, abilityIndex) => {
+        const rate = 1 / ability.period;
+        const growth = ability.growth.bonus * (uses[index]?.[abilityIndex] ?? 0);
+        const factor = rate * successFactor(ability, boosts[index] as CardBoosts);
+        for (const line of ability.bonus) {
+          addInto(byCard, scale(line.elements, (line.value + growth) * line.weight * factor));
+        }
+        addInto(consumed, scale(ability.cost, rate));
+      });
+      addInto(generated, byCard);
+      perCard[index]!.generated += totalOf(byCard);
+    });
+    stock = clampPositive(sum([stock, generated, scale(consumed, -1)]));
+
+    // 3. Dégâts et soins.
+    const damage: Record<string, number> = {};
+    const heal: Record<string, number> = {};
+    cards.forEach((card, index) => {
+      const cardBoosts = boosts[index] as CardBoosts;
+      const boostOf = (element: string) => 1 + BONUS_RATE * card.bonusFactor * (stock[element] ?? 0);
+      abilities[index]?.forEach((ability, abilityIndex) => {
+        const used = uses[index]?.[abilityIndex] ?? 0;
+        const factor = successFactor(ability, cardBoosts) / ability.period;
+        const effect = (lines: readonly EffectLine[], base: number, into: Record<string, number>) => {
+          let total = 0;
+          for (const line of lines) {
+            for (const [element, share] of Object.entries(line.elements)) {
+              const value = (line.value + base) * line.targets * line.weight * share * factor * boostOf(element);
+              into[element] = (into[element] ?? 0) + value;
+              total += value;
+            }
+          }
+          return total;
+        };
+        perCard[index]!.damage += effect(ability.damage, ability.growth.damage * used + cardBoosts.baseDamage, damage);
+        perCard[index]!.heal += effect(ability.heal, ability.growth.heal * used + cardBoosts.baseHeal, heal);
+        // Croissance « après utilisation » : comptée à partir de l'utilisation suivante.
+        uses[index]![abilityIndex] = used + 1 / ability.period;
+      });
+    });
+
+    addInto(totals.damage, damage);
+    addInto(totals.heal, heal);
+    addInto(totals.generated, generated);
+    addInto(totals.consumed, consumed);
     turns.push({
       turn,
       bonusStock: round(stock),
@@ -181,20 +265,74 @@ function project(
       totalDamage: roundValue(totalOf(damage)),
       totalHeal: roundValue(totalOf(heal)),
     });
-    const next = sum([stock, generatedPerTurn, scale(consumedPerTurn, -1)]);
-    stock = Object.fromEntries(Object.entries(next).map(([element, value]) => [element, Math.max(0, value)]));
   }
-  return turns;
+
+  const average = (amounts: ElementAmounts) => round(scale(amounts, 1 / turnCount));
+  const damagePerTurn = average(totals.damage);
+  const healPerTurn = average(totals.heal);
+
+  return {
+    cardCount: cards.length,
+    dpsCardId: dpsIndex >= 0 ? (cards[dpsIndex]?.cardId ?? null) : null,
+    averageResistances,
+    weaknesses:
+      cards.length === 0 ? [] : Object.keys(averageResistances).filter((element) => averageResistances[element] === lowest),
+    damagePerTurn,
+    totalDamagePerTurn: roundValue(totalOf(damagePerTurn)),
+    healPerTurn,
+    totalHealPerTurn: roundValue(totalOf(healPerTurn)),
+    generatedPerTurn: average(totals.generated),
+    consumedPerTurn: average(totals.consumed),
+    startingBonus,
+    turns,
+    cards: cards.map((card, index) => ({
+      cardId: card.cardId,
+      cardName: card.cardName,
+      talentName: card.talentName,
+      isDps: index === dpsIndex,
+      resistances: round(cardResistances[index] ?? {}),
+      damagePerTurn: roundValue((perCard[index]?.damage ?? 0) / turnCount),
+      healPerTurn: roundValue((perCard[index]?.heal ?? 0) / turnCount),
+      generatedPerTurn: roundValue((perCard[index]?.generated ?? 0) / turnCount),
+      finalBoosts: roundBoosts(boosts[index] ?? NO_BOOSTS),
+    })),
+    unquantified: [
+      ...notes,
+      ...[...unappliedTargeted].map((key) => {
+        const [cardName = '', source = ''] = key.split('|');
+        return { cardName, source, reason: 'renfort ciblé non appliqué : choisissez un DPS' };
+      }),
+    ],
+  };
+}
+
+/** Espérance de réussite × critique d'une capacité, renforts compris (plafonnés à 100 %). */
+function successFactor(ability: AbilityModel, boosts: CardBoosts): number {
+  const hit = clampRatio((ability.precision + boosts.precision) / 100);
+  const crit = clampRatio((ability.critChance + boosts.critChance) / 100);
+  return hit * (1 + crit * (ability.critMultiplier + boosts.critMultiplier - 1));
+}
+
+function clampRatio(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function clampPositive(amounts: ElementAmounts): Record<string, number> {
+  return Object.fromEntries(Object.entries(amounts).map(([element, value]) => [element, Math.max(0, value)]));
 }
 
 function sum(amounts: readonly ElementAmounts[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const entry of amounts) {
-    for (const [element, value] of Object.entries(entry)) {
-      result[element] = (result[element] ?? 0) + value;
-    }
+    addInto(result, entry);
   }
   return result;
+}
+
+function addInto(target: Record<string, number>, amounts: ElementAmounts): void {
+  for (const [element, value] of Object.entries(amounts)) {
+    target[element] = (target[element] ?? 0) + value;
+  }
 }
 
 function scale(amounts: ElementAmounts, factor: number): Record<string, number> {
@@ -206,7 +344,21 @@ function totalOf(amounts: ElementAmounts): number {
 }
 
 function round(amounts: ElementAmounts): ElementAmounts {
-  return Object.fromEntries(Object.entries(amounts).map(([element, value]) => [element, roundValue(value)]));
+  return Object.fromEntries(
+    Object.entries(amounts)
+      .filter(([, value]) => Math.abs(value) > 1e-9)
+      .map(([element, value]) => [element, roundValue(value)]),
+  );
+}
+
+function roundBoosts(boosts: CardBoosts): CardBoosts {
+  return {
+    precision: roundValue(boosts.precision),
+    critChance: roundValue(boosts.critChance),
+    critMultiplier: roundValue(boosts.critMultiplier),
+    baseDamage: roundValue(boosts.baseDamage),
+    baseHeal: roundValue(boosts.baseHeal),
+  };
 }
 
 function roundValue(value: number): number {
