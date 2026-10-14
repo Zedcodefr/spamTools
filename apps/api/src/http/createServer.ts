@@ -2,6 +2,7 @@ import { DomainError, NotFoundError } from '@spamtools/shared-kernel';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Container } from '../container.js';
 import { assetRoutes } from './assetRoutes.js';
+import { registerBasicAuth } from './basicAuth.js';
 import { catalogRoutes } from './catalogRoutes.js';
 import { collectionRoutes } from './collectionRoutes.js';
 import { deckRoutes } from './deckRoutes.js';
@@ -22,6 +23,9 @@ export function createServer(container: Container, { logger = true }: { logger?:
     return reply.code(500).send({ error: 'Erreur interne' });
   });
 
+  if (container.config.auth !== undefined) {
+    registerBasicAuth(app, container.config.auth);
+  }
   app.get('/api/health', async () => ({ status: 'ok' }));
   app.register(catalogRoutes, { container });
   app.register(deckRoutes, { container });

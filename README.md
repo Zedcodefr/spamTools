@@ -157,24 +157,31 @@ carte, stable d'une version à l'autre). « Tout sélectionner / désélectionne
 filtres compris ; « Afficher » : toutes, possédées ou manquantes. Dans le deck builder, « Uniquement mes
 cartes » limite l'autocomplétion aux cartes possédées.
 
-## Déploiement (Docker, ex. VPS OVH)
+## Déploiement (Docker)
 
-Une image unique (`Dockerfile`) : l'API Node sert aussi le front compilé. `compose.yaml` y ajoute **Caddy**,
-qui obtient le certificat HTTPS (Let's Encrypt) et protège l'accès par **mot de passe** : l'application n'a
-pas de comptes, sans lui n'importe qui pourrait modifier les decks et la collection. Les données (base
-SQLite, images) sont dans le volume `spamtools-data`.
+Une image unique (`Dockerfile`) : l'API Node sert aussi le front compilé. L'accès est protégé par **mot de
+passe** (HTTP Basic, vérifié par l'application elle-même, empreinte scrypt) : l'application n'a pas de comptes,
+sans lui n'importe qui pourrait modifier les decks et la collection. Seule `/api/health` reste ouverte. Les
+données (base SQLite, images) sont dans le volume `spamtools-data`. **Démarrage automatique** : le conteneur
+est en `restart: unless-stopped`, Docker le relance à chaque démarrage du serveur (`systemctl enable docker`).
 
-**Prérequis** : un serveur avec Docker et Docker Compose (Ubuntu : `curl -fsSL https://get.docker.com | sh`),
-un nom de domaine dont l'enregistrement DNS A (et AAAA si IPv6) pointe vers l'IP du serveur, les ports 80
-et 443 ouverts (pare-feu OVH et `ufw` le cas échéant).
+L'application n'écoute que sur `SPAMTOOLS_BIND` (jamais 0.0.0.0) ; le HTTPS est assuré devant elle :
+
+- **derrière un nginx existant** (ex. celui de mailcow) : `deploy/nginx/spamtools.conf` est le vhost à copier
+  dans `/opt/mailcow-dockerized/data/conf/nginx/`, le domaine s'ajoute à `ADDITIONAL_SAN` de `mailcow.conf`
+  pour le certificat, et `SPAMTOOLS_BIND` vaut l'adresse de `host.docker.internal` vue par nginx ;
+- **avec Caddy** fourni (certificat automatique) : `DOMAIN` dans `deploy/.env` et `--profile caddy`.
+
+Dans les deux cas le DNS A du domaine pointe vers l'IP publique et les ports 80/443 y sont ouverts.
 
 ```sh
 git clone <dépôt> spamtools && cd spamtools
+docker build -t spamtools:latest .
 cp deploy/.env.example deploy/.env
-docker run --rm caddy:2.10-alpine caddy hash-password --plaintext 'mot-de-passe'   # empreinte bcrypt
-nano deploy/.env        # DOMAIN, BASIC_AUTH_USER, BASIC_AUTH_HASH (doubler chaque $ en $$)
+printf '%s' 'mon mot de passe' | docker run --rm -i spamtools:latest hash-password   # empreinte scrypt
+nano deploy/.env        # SPAMTOOLS_AUTH_USER, SPAMTOOLS_AUTH_PASSWORD_HASH, SPAMTOOLS_BIND
 
-docker compose --env-file deploy/.env up -d --build          # démarre l'app et Caddy
+docker compose --env-file deploy/.env up -d                    # (+ --profile caddy le cas échéant)
 docker compose --env-file deploy/.env run --rm app sync --all  # première importation des cartes
 ```
 
@@ -186,6 +193,7 @@ docker compose --env-file deploy/.env run --rm app sync --all  # première impor
 | Sauvegarder les données | `docker compose --env-file deploy/.env stop app && docker run --rm -v spamtools_spamtools-data:/data -v "$PWD":/backup alpine tar czf /backup/spamtools-data.tgz -C /data . && docker compose --env-file deploy/.env start app` |
 
 Réglages de l'image (variables d'environnement) : `PORT` (3000), `HOST` (0.0.0.0), `SPAMTOOLS_DATA_DIR`
-(`/data`), `SPAMTOOLS_WEB_DIR` (front compilé, `/app/web`). Le site reste soumis aux conditions d'utilisation
+(`/data`), `SPAMTOOLS_WEB_DIR` (front compilé, `/app/web`), `SPAMTOOLS_AUTH_USER` et
+`SPAMTOOLS_AUTH_PASSWORD_HASH` (sans eux, pas de mot de passe : réservé au développement local). Le site reste soumis aux conditions d'utilisation
 des données de cartes (projet non commercial, artistes crédités, mention « non officiel »).
 

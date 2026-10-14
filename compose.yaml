@@ -1,7 +1,13 @@
-# Déploiement : application + Caddy (HTTPS automatique Let's Encrypt, mot de passe d'accès).
-# Préparer deploy/.env (voir deploy/.env.example), puis :
+# Déploiement. Préparer deploy/.env (voir deploy/.env.example), puis :
 #   docker compose --env-file deploy/.env up -d --build
 #   docker compose --env-file deploy/.env run --rm app sync --all
+# Démarrage automatique : « restart: unless-stopped » relance le conteneur au démarrage de Docker
+# (service docker activé au boot : systemctl enable docker).
+#
+# Deux façons d'exposer l'application en HTTPS :
+#   - derrière un reverse proxy existant (nginx de mailcow, voir deploy/nginx/spamtools.conf) :
+#     SPAMTOOLS_BIND désigne l'adresse où le proxy la joint ;
+#   - avec Caddy fourni ici (certificat automatique) : ajouter --profile caddy.
 name: spamtools
 
 services:
@@ -9,11 +15,14 @@ services:
     build: .
     image: spamtools:latest
     restart: unless-stopped
+    environment:
+      SPAMTOOLS_AUTH_USER: ${SPAMTOOLS_AUTH_USER:?définir SPAMTOOLS_AUTH_USER dans deploy/.env}
+      SPAMTOOLS_AUTH_PASSWORD_HASH: ${SPAMTOOLS_AUTH_PASSWORD_HASH:?définir SPAMTOOLS_AUTH_PASSWORD_HASH dans deploy/.env}
     volumes:
       - spamtools-data:/data
-    # Pas de port publié : seul Caddy est exposé.
-    expose:
-      - "3000"
+    # Jamais 0.0.0.0 : l'application ne doit être joignable que par le reverse proxy.
+    ports:
+      - "${SPAMTOOLS_BIND:-127.0.0.1:3100}:3000"
     # Aussi dans le Dockerfile ; repris ici pour les moteurs qui l'ignorent (images au format OCI, Podman).
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
@@ -24,6 +33,7 @@ services:
 
   caddy:
     image: caddy:2.10-alpine
+    profiles: [caddy]
     restart: unless-stopped
     depends_on:
       app:
@@ -33,9 +43,8 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      DOMAIN: ${DOMAIN:?définir DOMAIN dans deploy/.env}
-      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?définir BASIC_AUTH_USER dans deploy/.env}
-      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?définir BASIC_AUTH_HASH dans deploy/.env}
+      # Obligatoire avec ce profil : Caddy refuse de démarrer sans domaine.
+      DOMAIN: ${DOMAIN:-}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
