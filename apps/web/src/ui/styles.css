@@ -69,6 +69,7 @@ button:disabled {
 
 .app__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 1rem;
   padding: 1rem 1.5rem;
@@ -84,6 +85,7 @@ button:disabled {
 
 .app__nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1.25rem;
 }
 

@@ -42,24 +42,38 @@ describe('Decks', () => {
     let tick = 0;
     const save = new SaveDeck(decks, provider, () => new Date(2026, 9, 14, 12, tick++));
 
-    const created = await save.execute({ name: 'Feu', version: '1.21', language: 'fr', slots: slots('c1', 'c2') });
-    await save.execute({ name: 'Eau', version: '1.21', language: 'fr', slots: slots('c3') });
-    const updated = await save.execute({ id: created.id, name: 'Feu 2', version: '1.21', language: 'fr', slots: slots('c1') });
+    const created = await save.execute({ name: 'Feu', version: '1.21', language: 'fr', ownerId: 'zed', slots: slots('c1', 'c2') });
+    await save.execute({ name: 'Eau', version: '1.21', language: 'fr', ownerId: 'zed', slots: slots('c3') });
+    const updated = await save.execute({ id: created.id, name: 'Feu 2', version: '1.21', language: 'fr', ownerId: 'zed', slots: slots('c1') });
 
     assert.equal(updated.id, created.id);
-    assert.deepEqual((await new ListDecks(decks).execute()).map((deck) => deck.name), ['Feu 2', 'Eau']);
-    assert.equal((await new GetDeck(decks).execute({ id: created.id })).slots.length, 1);
+    assert.deepEqual((await new ListDecks(decks).execute({ ownerId: 'zed' })).map((deck) => deck.name), ['Feu 2', 'Eau']);
+    assert.equal((await new GetDeck(decks).execute({ id: created.id, ownerId: 'zed' })).slots.length, 1);
 
-    await new DeleteDeck(decks).execute({ id: created.id });
-    await assert.rejects(new GetDeck(decks).execute({ id: created.id }), NotFoundError);
-    await assert.rejects(new DeleteDeck(decks).execute({ id: created.id }), NotFoundError);
+    await new DeleteDeck(decks).execute({ id: created.id, ownerId: 'zed' });
+    await assert.rejects(new GetDeck(decks).execute({ id: created.id, ownerId: 'zed' }), NotFoundError);
+    await assert.rejects(new DeleteDeck(decks).execute({ id: created.id, ownerId: 'zed' }), NotFoundError);
+  });
+
+  it('isole les decks de chaque compte : ceux des autres sont introuvables', async () => {
+    const decks = new InMemoryDeckRepository();
+    const save = new SaveDeck(decks, provider);
+    const mine = await save.execute({ name: 'À moi', version: '1.21', language: 'fr', ownerId: 'zed', slots: slots('c1') });
+    await save.execute({ name: 'À Alice', version: '1.21', language: 'fr', ownerId: 'alice', slots: slots('c2') });
+
+    assert.deepEqual((await new ListDecks(decks).execute({ ownerId: 'alice' })).map((deck) => deck.name), ['À Alice']);
+    const asAlice = { id: mine.id, ownerId: 'alice' };
+    await assert.rejects(new GetDeck(decks).execute(asAlice), NotFoundError);
+    await assert.rejects(new DeleteDeck(decks).execute(asAlice), NotFoundError);
+    await assert.rejects(save.execute({ ...asAlice, name: 'Volé', version: '1.21', language: 'fr', slots: [] }), NotFoundError);
+    assert.equal((await new GetDeck(decks).execute({ id: mine.id, ownerId: 'zed' })).name, 'À moi');
   });
 
   it("refuse d'enregistrer une carte ou un talent inconnus", async () => {
     const save = new SaveDeck(new InMemoryDeckRepository(), provider);
-    await assert.rejects(save.execute({ name: 'X', version: '1.21', language: 'fr', slots: slots('inconnue') }), NotFoundError);
+    await assert.rejects(save.execute({ name: 'X', version: '1.21', language: 'fr', ownerId: 'zed', slots: slots('inconnue') }), NotFoundError);
     await assert.rejects(
-      save.execute({ id: 'absent', name: 'X', version: '1.21', language: 'fr', slots: [] }),
+      save.execute({ id: 'absent', name: 'X', version: '1.21', language: 'fr', ownerId: 'zed', slots: [] }),
       NotFoundError,
     );
   });

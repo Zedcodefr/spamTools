@@ -289,4 +289,51 @@ export const migrations: readonly SqlMigration[] = [
       );
     `,
   },
+  {
+    version: 9,
+    name: 'create_accounts',
+    sql: `
+      -- Comptes : créés par un administrateur, sans mot de passe jusqu'à l'utilisation du lien d'invitation.
+      CREATE TABLE account (
+        id                   TEXT PRIMARY KEY,
+        username             TEXT NOT NULL UNIQUE,
+        role                 TEXT NOT NULL CHECK (role IN ('admin', 'member')),
+        password_hash        TEXT,
+        disabled             INTEGER NOT NULL DEFAULT 0,
+        created_at           TEXT NOT NULL,
+        password_changed_at  TEXT
+      );
+
+      -- Sessions et liens de mot de passe : seule l'empreinte du jeton est conservée.
+      CREATE TABLE session (
+        token_hash  TEXT PRIMARY KEY,
+        account_id  TEXT NOT NULL REFERENCES account (id) ON DELETE CASCADE,
+        created_at  TEXT NOT NULL,
+        expires_at  TEXT NOT NULL
+      );
+      CREATE INDEX session_account ON session (account_id);
+
+      CREATE TABLE password_link (
+        token_hash  TEXT PRIMARY KEY,
+        account_id  TEXT NOT NULL UNIQUE REFERENCES account (id) ON DELETE CASCADE,
+        created_at  TEXT NOT NULL,
+        expires_at  TEXT NOT NULL
+      );
+
+      -- Decks et collection appartiennent à un compte. Les données d'avant les comptes restent sans
+      -- propriétaire (NULL) jusqu'à la création du premier administrateur, qui les reçoit.
+      ALTER TABLE deck ADD COLUMN owner_id TEXT REFERENCES account (id) ON DELETE CASCADE;
+      CREATE INDEX deck_owner ON deck (owner_id, updated_at);
+
+      CREATE TABLE owned_card_new (
+        owner_id  TEXT REFERENCES account (id) ON DELETE CASCADE,
+        card_id   TEXT NOT NULL,
+        added_at  TEXT NOT NULL,
+        UNIQUE (owner_id, card_id)
+      );
+      INSERT INTO owned_card_new (owner_id, card_id, added_at) SELECT NULL, card_id, added_at FROM owned_card;
+      DROP TABLE owned_card;
+      ALTER TABLE owned_card_new RENAME TO owned_card;
+    `,
+  },
 ];

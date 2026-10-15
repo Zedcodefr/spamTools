@@ -8,6 +8,7 @@ import { createContainer, type Container } from '../container.js';
 import { fakeSpamGameSource } from '../test-support/fakeSpamGameSource.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from './createServer.js';
+import { signInAdmin, type Inject } from '../test-support/signIn.js';
 
 const FIRE_SPIRIT = '18bca5cf-7aa1-421c-85ec-4ed0b6a8ca70';
 
@@ -15,6 +16,7 @@ describe('API catalogue', () => {
   let directory: string;
   let container: Container;
   let app: FastifyInstance;
+  let inject: Inject;
 
   before(async () => {
     directory = await mkdtemp(path.join(tmpdir(), 'spamtools-api-'));
@@ -34,6 +36,7 @@ describe('API catalogue', () => {
     await container.syncCatalog.execute({ language: 'fr', version: '1.9' });
     await container.syncCatalog.execute({ language: 'fr' });
     app = createServer(container, { logger: false });
+    ({ inject } = await signInAdmin(app, container));
   });
 
   after(async () => {
@@ -42,7 +45,7 @@ describe('API catalogue', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  const get = (url: string) => app.inject({ method: 'GET', url });
+  const get = (url: string) => inject({ method: 'GET', url });
 
   it('GET /api/catalog décrit la dernière version et les versions disponibles', async () => {
     const response = await get('/api/catalog');
@@ -113,7 +116,7 @@ describe('API catalogue', () => {
   describe('collection', () => {
     it('ajoute et retire des cartes possédées', async () => {
       const put = (cardIds: string[], owned: boolean) =>
-        app.inject({ method: 'PUT', url: '/api/collection/cards', payload: { cardIds, owned } });
+        inject({ method: 'PUT', url: '/api/collection/cards', payload: { cardIds, owned } });
       assert.deepEqual((await put([FIRE_SPIRIT, 'autre'], true)).json().cardIds, [FIRE_SPIRIT, 'autre'].sort());
       assert.deepEqual((await put(['autre'], false)).json().cardIds, [FIRE_SPIRIT]);
       assert.deepEqual((await get('/api/collection')).json().cardIds, [FIRE_SPIRIT]);
@@ -123,7 +126,7 @@ describe('API catalogue', () => {
 
   describe('decks', () => {
     const send = (method: 'POST' | 'PUT', url: string, payload: Record<string, unknown>) =>
-      app.inject({ method, url, payload });
+      inject({ method, url, payload });
 
     it('crée, modifie, liste et supprime un deck', async () => {
       const created = await send('POST', '/api/decks', {
@@ -146,7 +149,7 @@ describe('API catalogue', () => {
       assert.deepEqual(updated.json().slots, []);
       assert.deepEqual((await get('/api/decks')).json().map((deck: { name: string }) => deck.name), ['Test 2']);
 
-      assert.equal((await app.inject({ method: 'DELETE', url: `/api/decks/${id}` })).statusCode, 204);
+      assert.equal((await inject({ method: 'DELETE', url: `/api/decks/${id}` })).statusCode, 204);
       assert.equal((await get(`/api/decks/${id}`)).statusCode, 404);
     });
 

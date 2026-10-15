@@ -12,6 +12,7 @@ packages/
   card-catalog/         Catalogue des cartes : modèle, synchro depuis spamgame.com, consultation
   deck/                 Decks : composition (4 cartes et leur talent), enregistrement, analyse
   collection/           Mes cartes : les cartes que possède le joueur
+  identity/             Comptes : connexion (sessions), liens de mot de passe, administration
 ```
 
 ## Couches (dans chaque package)
@@ -157,12 +158,35 @@ carte, stable d'une version à l'autre). « Tout sélectionner / désélectionne
 filtres compris ; « Afficher » : toutes, possédées ou manquantes. Dans le deck builder, « Uniquement mes
 cartes » limite l'autocomplétion aux cartes possédées.
 
+## Comptes (`/compte`, `/admin`)
+
+Le site est privé : toute l'API (images comprises) exige une connexion, seules la sonde `/api/health` et les
+routes de connexion sont ouvertes. Chaque compte a ses propres decks et sa propre collection.
+
+- **Création par un administrateur**, sans mot de passe : il reçoit un **lien d'invitation**
+  (`/mot-de-passe#<jeton>`, une seule fois, 3 jours) à transmettre au titulaire, qui choisit le sien. Le jeton
+  est dans le fragment de l'URL : le navigateur ne l'envoie jamais au serveur ni dans les journaux.
+- **Mot de passe oublié** : l'administrateur génère un lien de réinitialisation (même principe) ; les
+  sessions du compte sont fermées à son utilisation.
+- **Mon compte** : changer de mot de passe (les autres sessions sont fermées), se déconnecter de tous ses
+  appareils.
+- **Administration** : rôle (administrateur / membre), désactivation (sessions fermées), suppression (decks
+  et collection compris). Un administrateur ne modifie pas son propre compte depuis l'administration : il
+  reste toujours un administrateur actif.
+- **Premier administrateur**, en ligne de commande sur le serveur : `spamtools create-admin <identifiant>`
+  (`pnpm --filter @spamtools/api exec node dist/cli/createAdmin.js <identifiant>` en local). Il reçoit les
+  decks et la collection d'avant les comptes.
+
+Sécurité : mots de passe de 12 caractères au moins, empreinte scrypt (`node:crypto`) ; session de 30 jours
+dans un cookie `HttpOnly`, `Secure` (production), `SameSite=Strict`, dont seule l'empreinte est en base ;
+modifications refusées si elles viennent d'un autre site (origine vérifiée) ; 10 tentatives par minute et
+par adresse sur la connexion, les liens et le changement de mot de passe (`@fastify/rate-limit`) ; message
+d'échec identique que l'identifiant existe ou non.
+
 ## Déploiement (Docker)
 
-Une image unique (`Dockerfile`) : l'API Node sert aussi le front compilé. L'accès est protégé par **mot de
-passe** (HTTP Basic, vérifié par l'application elle-même, empreinte scrypt) : l'application n'a pas de comptes,
-sans lui n'importe qui pourrait modifier les decks et la collection. Seule `/api/health` reste ouverte. Les
-données (base SQLite, images) sont dans le volume `spamtools-data`. **Démarrage automatique** : le conteneur
+Une image unique (`Dockerfile`) : l'API Node sert aussi le front compilé. L'accès est géré par les comptes
+(voir ci-dessus). Les données (base SQLite, images) sont dans le volume `spamtools-data`. **Démarrage automatique** : le conteneur
 est en `restart: unless-stopped`, Docker le relance à chaque démarrage du serveur (`systemctl enable docker`).
 
 L'application n'écoute que sur `SPAMTOOLS_BIND` (jamais 0.0.0.0) ; le HTTPS est assuré devant elle :
@@ -178,11 +202,11 @@ Dans les deux cas le DNS A du domaine pointe vers l'IP publique et les ports 80/
 git clone <dépôt> spamtools && cd spamtools
 docker build -t spamtools:latest .
 cp deploy/.env.example deploy/.env
-printf '%s' 'mon mot de passe' | docker run --rm -i spamtools:latest hash-password   # empreinte scrypt
-nano deploy/.env        # SPAMTOOLS_AUTH_USER, SPAMTOOLS_AUTH_PASSWORD_HASH, SPAMTOOLS_BIND
+nano deploy/.env        # SPAMTOOLS_PUBLIC_URL, SPAMTOOLS_BIND
 
 docker compose --env-file deploy/.env up -d                    # (+ --profile caddy le cas échéant)
 docker compose --env-file deploy/.env run --rm app sync --all  # première importation des cartes
+docker compose --env-file deploy/.env run --rm app create-admin moi   # affiche le lien d'invitation
 ```
 
 | Tâche | Commande |
@@ -193,7 +217,8 @@ docker compose --env-file deploy/.env run --rm app sync --all  # première impor
 | Sauvegarder les données | `docker compose --env-file deploy/.env stop app && docker run --rm -v spamtools_spamtools-data:/data -v "$PWD":/backup alpine tar czf /backup/spamtools-data.tgz -C /data . && docker compose --env-file deploy/.env start app` |
 
 Réglages de l'image (variables d'environnement) : `PORT` (3000), `HOST` (0.0.0.0), `SPAMTOOLS_DATA_DIR`
-(`/data`), `SPAMTOOLS_WEB_DIR` (front compilé, `/app/web`), `SPAMTOOLS_AUTH_USER` et
-`SPAMTOOLS_AUTH_PASSWORD_HASH` (sans eux, pas de mot de passe : réservé au développement local). Le site reste soumis aux conditions d'utilisation
+(`/data`), `SPAMTOOLS_WEB_DIR` (front compilé, `/app/web`), `SPAMTOOLS_TRUST_PROXY` (derrière un reverse
+proxy), `SPAMTOOLS_SECURE_COOKIES` (par défaut en production), `SPAMTOOLS_PUBLIC_URL` (liens de
+`create-admin`). Le site reste soumis aux conditions d'utilisation
 des données de cartes (projet non commercial, artistes crédités, mention « non officiel »).
 

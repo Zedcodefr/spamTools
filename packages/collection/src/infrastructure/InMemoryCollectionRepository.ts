@@ -2,18 +2,20 @@ import type { CollectionRepository } from '../application/index.js';
 import { Collection } from '../domain/index.js';
 
 export class InMemoryCollectionRepository implements CollectionRepository {
-  private readonly owned = new Set<string>();
+  private readonly owned = new Map<string, Set<string>>();
 
-  async load(): Promise<Collection> {
-    return Collection.of(this.owned);
+  async load(ownerId: string): Promise<Collection> {
+    return Collection.of(this.owned.get(ownerId) ?? []);
   }
 
-  async saveChanges(cardIds: readonly string[], owned: boolean): Promise<void> {
+  async saveChanges(ownerId: string, cardIds: readonly string[], owned: boolean): Promise<void> {
+    const cards = this.owned.get(ownerId) ?? new Set<string>();
+    this.owned.set(ownerId, cards);
     for (const id of cardIds) {
       if (owned) {
-        this.owned.add(id);
+        cards.add(id);
       } else {
-        this.owned.delete(id);
+        cards.delete(id);
       }
     }
   }

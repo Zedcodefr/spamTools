@@ -9,13 +9,20 @@ describe('Collection', () => {
     const repository = new InMemoryCollectionRepository();
     const set = new SetCardsOwned(repository);
 
-    await set.execute({ cardIds: ['b', 'a', 'c'], owned: true });
-    await set.execute({ cardIds: ['a'], owned: true });
-    assert.deepEqual((await set.execute({ cardIds: ['c', 'z'], owned: false })).cardIds, ['a', 'b']);
-    assert.deepEqual((await new GetCollection(repository).execute()).cardIds, ['a', 'b']);
+    await set.execute({ ownerId: 'zed', cardIds: ['b', 'a', 'c'], owned: true });
+    await set.execute({ ownerId: 'zed', cardIds: ['a'], owned: true });
+    assert.deepEqual((await set.execute({ ownerId: 'zed', cardIds: ['c', 'z'], owned: false })).cardIds, ['a', 'b']);
+    assert.deepEqual((await new GetCollection(repository).execute({ ownerId: 'zed' })).cardIds, ['a', 'b']);
+  });
+
+  it('donne à chaque compte sa propre collection', async () => {
+    const repository = new InMemoryCollectionRepository();
+    await new SetCardsOwned(repository).execute({ ownerId: 'zed', cardIds: ['a'], owned: true });
+    await new SetCardsOwned(repository).execute({ ownerId: 'alice', cardIds: ['b'], owned: true });
+    assert.deepEqual((await new GetCollection(repository).execute({ ownerId: 'alice' })).cardIds, ['b']);
   });
 
   it('refuse un identifiant vide', async () => {
-    await assert.rejects(new SetCardsOwned(new InMemoryCollectionRepository()).execute({ cardIds: [' '], owned: true }), DomainError);
+    await assert.rejects(new SetCardsOwned(new InMemoryCollectionRepository()).execute({ ownerId: 'zed', cardIds: [' '], owned: true }), DomainError);
   });
 });

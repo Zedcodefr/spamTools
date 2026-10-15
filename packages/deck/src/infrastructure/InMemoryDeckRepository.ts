@@ -12,8 +12,8 @@ export class InMemoryDeckRepository implements DeckRepository {
     return this.decks.get(id.value);
   }
 
-  async list(): Promise<Deck[]> {
-    return [...this.decks.values()].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  async list(ownerId: string): Promise<Deck[]> {
+    return [...this.decks.values()].filter((deck) => deck.isOwnedBy(ownerId)).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
   async delete(id: DeckId): Promise<boolean> {

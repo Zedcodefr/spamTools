@@ -1,8 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { HttpAccountsGateway, HttpAuthGateway } from './infrastructure/HttpAuthGateway.ts';
 import { HttpCatalogGateway } from './infrastructure/HttpCatalogGateway.ts';
 import { HttpCollectionGateway } from './infrastructure/HttpCollectionGateway.ts';
 import { HttpDeckGateway } from './infrastructure/HttpDeckGateway.ts';
+import { AuthGate } from './ui/account/AuthGate.tsx';
 import { App } from './ui/App.tsx';
 import { GatewaysProvider, type Gateways } from './ui/GatewaysContext.tsx';
 import './ui/styles.css';
@@ -12,6 +14,8 @@ const gateways: Gateways = {
   catalog: new HttpCatalogGateway(),
   decks: new HttpDeckGateway(),
   collection: new HttpCollectionGateway(),
+  auth: new HttpAuthGateway(),
+  accounts: new HttpAccountsGateway(),
 };
 
 const root = document.getElementById('root');
@@ -22,7 +26,7 @@ if (root === null) {
 createRoot(root).render(
   <StrictMode>
     <GatewaysProvider gateways={gateways}>
-      <App />
+      <AuthGate>{(session) => <App session={session} />}</AuthGate>
     </GatewaysProvider>
   </StrictMode>,
 );

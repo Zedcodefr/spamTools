@@ -2,6 +2,7 @@ import type { CatalogGateway } from '../application/ports/CatalogGateway.ts';
 import type { Card } from '../domain/Card.ts';
 import type { CardLayout } from '../domain/CardLayout.ts';
 import type { CatalogOverview } from '../domain/Catalog.ts';
+import { apiFetch } from './apiFetch.ts';
 
 /**
  * Adaptateur : implémente le port en appelant l'API (apps/api).
@@ -31,7 +32,7 @@ export class HttpCatalogGateway implements CatalogGateway {
 
   private async get<T>(path: string, version?: string): Promise<T> {
     const query = version === undefined ? '' : `?${new URLSearchParams({ version })}`;
-    const response = await fetch(`${this.baseUrl}${path}${query}`);
+    const response = await apiFetch(`${this.baseUrl}${path}${query}`);
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
       throw new Error(body?.error ?? `Erreur serveur (${response.status})`);

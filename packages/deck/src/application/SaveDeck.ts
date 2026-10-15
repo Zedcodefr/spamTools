@@ -1,11 +1,14 @@
-import { NotFoundError, type UseCase } from '@spamtools/shared-kernel';
-import { Deck, DeckId, type DeckContent } from '../domain/index.js';
+import type { UseCase } from '@spamtools/shared-kernel';
+import { Deck, type DeckContent } from '../domain/index.js';
+import { findOwnedDeck } from './DeckQueries.js';
 import { toDeckView, type DeckView } from './DeckView.js';
 import type { DeckCardStatsProvider, DeckRepository } from './ports/index.js';
 
 export interface SaveDeckInput extends DeckContent {
   /** Absent : création d'un nouveau deck. */
   readonly id?: string | undefined;
+  /** Compte qui enregistre : propriétaire du nouveau deck, ou qui doit posséder celui modifié. */
+  readonly ownerId: string;
 }
 
 /**
@@ -29,12 +32,9 @@ export class SaveDeck implements UseCase<SaveDeckInput, DeckView> {
     };
     let deck: Deck;
     if (input.id === undefined) {
-      deck = Deck.create(content, this.clock());
+      deck = Deck.create(input.ownerId, content, this.clock());
     } else {
-      const existing = await this.decks.findById(new DeckId(input.id));
-      if (existing === undefined) {
-        throw new NotFoundError(`Deck introuvable : ${input.id}`);
-      }
+      const existing = await findOwnedDeck(this.decks, { id: input.id, ownerId: input.ownerId });
       existing.update(content, this.clock());
       deck = existing;
     }

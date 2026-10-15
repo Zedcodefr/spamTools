@@ -1,5 +1,4 @@
 import path from 'node:path';
-import type { AuthConfig } from './http/basicAuth.js';
 
 export interface AppConfig {
   readonly databasePath: string;
@@ -9,8 +8,10 @@ export interface AppConfig {
   readonly language: string;
   /** Images des cartes, rangées comme dans le dossier data/ de spamgame.com. */
   readonly assetsDirectory: string;
-  /** Accès protégé par mot de passe ; absent en développement local. */
-  readonly auth?: AuthConfig | undefined;
+  /** Cookie de session réservé au HTTPS (production) ; désactivé en développement local (HTTP). */
+  readonly secureCookies?: boolean | undefined;
+  /** Derrière un reverse proxy : l'adresse du client est lue dans X-Forwarded-For (limitation des tentatives). */
+  readonly trustProxy?: boolean | undefined;
 }
 
 /** Par défaut : dossier `data/` à la racine du dépôt (ignoré par git). */
@@ -19,16 +20,16 @@ const DEFAULT_DATA_DIRECTORY = path.resolve(__dirname, '../../../data');
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const dataDirectory = path.resolve(env['SPAMTOOLS_DATA_DIR'] ?? DEFAULT_DATA_DIRECTORY);
   const webDirectory = env['SPAMTOOLS_WEB_DIR'];
-  const user = env['SPAMTOOLS_AUTH_USER'] ?? '';
-  const passwordHash = env['SPAMTOOLS_AUTH_PASSWORD_HASH'] ?? '';
-  if ((user === '') !== (passwordHash === '')) {
-    throw new Error('SPAMTOOLS_AUTH_USER et SPAMTOOLS_AUTH_PASSWORD_HASH vont ensemble : définir les deux, ou aucun');
-  }
+  const flag = (name: string, fallback: boolean) => {
+    const value = env[name];
+    return value === undefined || value === '' ? fallback : ['1', 'true', 'oui'].includes(value.toLowerCase());
+  };
   return {
     databasePath: path.join(dataDirectory, 'spamtools.sqlite'),
     ...(webDirectory !== undefined && webDirectory !== '' && { webDirectory: path.resolve(webDirectory) }),
     language: 'fr',
     assetsDirectory: path.join(dataDirectory, 'assets'),
-    ...(user !== '' && { auth: { user, passwordHash } }),
+    secureCookies: flag('SPAMTOOLS_SECURE_COOKIES', env['NODE_ENV'] === 'production'),
+    trustProxy: flag('SPAMTOOLS_TRUST_PROXY', false),
   };
 }

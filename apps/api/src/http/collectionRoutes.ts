@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.js';
+import { accountOf } from './authentication.js';
 
 interface OwnedBody {
   cardIds: string[];
@@ -7,10 +8,10 @@ interface OwnedBody {
 }
 
 /**
- * Adaptateur entrant : la collection du joueur (cartes possédées).
+ * Adaptateur entrant : la collection du compte connecté (cartes possédées).
  */
 export async function collectionRoutes(app: FastifyInstance, { container }: { container: Container }): Promise<void> {
-  app.get('/api/collection', () => container.getCollection.execute());
+  app.get('/api/collection', (request) => container.getCollection.execute({ ownerId: accountOf(request).id }));
 
   // Ajoute (owned: true) ou retire des cartes ; une seule ou plusieurs (tout sélectionner).
   app.put<{ Body: OwnedBody }>(
@@ -27,6 +28,6 @@ export async function collectionRoutes(app: FastifyInstance, { container }: { co
         },
       },
     },
-    (request) => container.setCardsOwned.execute(request.body),
+    (request) => container.setCardsOwned.execute({ ...request.body, ownerId: accountOf(request).id }),
   );
 }

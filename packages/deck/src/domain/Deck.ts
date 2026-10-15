@@ -21,10 +21,12 @@ export interface DeckContent {
 
 /**
  * Agrégat : un deck de 4 cartes au plus, sans doublon, chacune avec au plus un talent.
+ * Il appartient à un compte (ownerId) : seul son propriétaire le voit et le modifie.
  */
 export class Deck extends AggregateRoot<DeckId> {
   private constructor(
     id: DeckId,
+    readonly ownerId: string,
     private content: DeckContent,
     readonly createdAt: Date,
     private _updatedAt: Date,
@@ -32,13 +34,20 @@ export class Deck extends AggregateRoot<DeckId> {
     super(id);
   }
 
-  static create(content: DeckContent, now: Date, id: DeckId = new DeckId()): Deck {
-    return new Deck(id, Deck.validate(content), now, now);
+  static create(ownerId: string, content: DeckContent, now: Date, id: DeckId = new DeckId()): Deck {
+    if (ownerId.trim() === '') {
+      throw new DomainError('Un deck appartient à un compte');
+    }
+    return new Deck(id, ownerId, Deck.validate(content), now, now);
   }
 
   /** Reconstitution depuis la persistance. */
-  static restore(id: DeckId, content: DeckContent, createdAt: Date, updatedAt: Date): Deck {
-    return new Deck(id, Deck.validate(content), createdAt, updatedAt);
+  static restore(id: DeckId, ownerId: string, content: DeckContent, createdAt: Date, updatedAt: Date): Deck {
+    return new Deck(id, ownerId, Deck.validate(content), createdAt, updatedAt);
+  }
+
+  isOwnedBy(accountId: string): boolean {
+    return this.ownerId === accountId;
   }
 
   get name(): string {

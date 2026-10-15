@@ -13,10 +13,13 @@
     "dev": "node --watch dist/main.js"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/rate-limit": "11.2.0",
     "@spamtools/card-catalog": "workspace:*",
     "@spamtools/collection": "workspace:*",
     "@spamtools/database": "workspace:*",
     "@spamtools/deck": "workspace:*",
+    "@spamtools/identity": "workspace:*",
     "@spamtools/shared-kernel": "workspace:*",
     "fastify": "^5.12.7"
   }

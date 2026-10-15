@@ -1,35 +1,45 @@
 import { NotFoundError, type UseCase } from '@spamtools/shared-kernel';
-import { analyzeDeck, DeckId, type DeckAnalysis, type DeckSlot } from '../domain/index.js';
+import { analyzeDeck, DeckId, type Deck, type DeckAnalysis, type DeckSlot } from '../domain/index.js';
 import { toDeckView, type DeckView } from './DeckView.js';
 import type { DeckCardStatsProvider, DeckRepository } from './ports/index.js';
 
-export class ListDecks implements UseCase<void, DeckView[]> {
+/** Un deck désigné par son identifiant, pour le compte qui le demande. */
+export interface OwnedDeckInput {
+  readonly id: string;
+  readonly ownerId: string;
+}
+
+/** Deck du compte ; celui d'un autre compte est « introuvable » (son existence n'est pas révélée). */
+export async function findOwnedDeck(decks: DeckRepository, { id, ownerId }: OwnedDeckInput): Promise<Deck> {
+  const deck = await decks.findById(new DeckId(id));
+  if (deck === undefined || !deck.isOwnedBy(ownerId)) {
+    throw new NotFoundError(`Deck introuvable : ${id}`);
+  }
+  return deck;
+}
+
+export class ListDecks implements UseCase<{ readonly ownerId: string }, DeckView[]> {
   constructor(private readonly decks: DeckRepository) {}
 
-  async execute(): Promise<DeckView[]> {
-    return (await this.decks.list()).map(toDeckView);
+  async execute({ ownerId }: { readonly ownerId: string }): Promise<DeckView[]> {
+    return (await this.decks.list(ownerId)).map(toDeckView);
   }
 }
 
-export class GetDeck implements UseCase<{ readonly id: string }, DeckView> {
+export class GetDeck implements UseCase<OwnedDeckInput, DeckView> {
   constructor(private readonly decks: DeckRepository) {}
 
-  async execute({ id }: { readonly id: string }): Promise<DeckView> {
-    const deck = await this.decks.findById(new DeckId(id));
-    if (deck === undefined) {
-      throw new NotFoundError(`Deck introuvable : ${id}`);
-    }
-    return toDeckView(deck);
+  async execute(input: OwnedDeckInput): Promise<DeckView> {
+    return toDeckView(await findOwnedDeck(this.decks, input));
   }
 }
 
-export class DeleteDeck implements UseCase<{ readonly id: string }, void> {
+export class DeleteDeck implements UseCase<OwnedDeckInput, void> {
   constructor(private readonly decks: DeckRepository) {}
 
-  async execute({ id }: { readonly id: string }): Promise<void> {
-    if (!(await this.decks.delete(new DeckId(id)))) {
-      throw new NotFoundError(`Deck introuvable : ${id}`);
-    }
+  async execute(input: OwnedDeckInput): Promise<void> {
+    const deck = await findOwnedDeck(this.decks, input);
+    await this.decks.delete(deck.id);
   }
 }
 

@@ -10,12 +10,13 @@ export class SqliteDeckRepository implements DeckRepository {
   async save(deck: Deck): Promise<void> {
     this.database.transaction((db) => {
       db.prepare(
-        `INSERT INTO deck (id, name, version, language, dps_card_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO deck (id, owner_id, name, version, language, dps_card_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET name = excluded.name, version = excluded.version,
            language = excluded.language, dps_card_id = excluded.dps_card_id, updated_at = excluded.updated_at`,
       ).run(
         deck.id.value,
+        deck.ownerId,
         deck.name,
         deck.version,
         deck.language,
@@ -30,14 +31,15 @@ export class SqliteDeckRepository implements DeckRepository {
   }
 
   async findById(id: DeckId): Promise<Deck | undefined> {
-    const row = this.database.connection.prepare('SELECT * FROM deck WHERE id = ?').get(id.value);
+    // Un deck sans propriétaire (d'avant les comptes) n'est visible de personne.
+    const row = this.database.connection.prepare('SELECT * FROM deck WHERE id = ? AND owner_id IS NOT NULL').get(id.value);
     return row === undefined ? undefined : this.restore(row);
   }
 
-  async list(): Promise<Deck[]> {
+  async list(ownerId: string): Promise<Deck[]> {
     return this.database.connection
-      .prepare('SELECT * FROM deck ORDER BY updated_at DESC')
-      .all()
+      .prepare('SELECT * FROM deck WHERE owner_id = ? ORDER BY updated_at DESC')
+      .all(ownerId)
       .map((row) => this.restore(row));
   }
 
@@ -56,6 +58,7 @@ export class SqliteDeckRepository implements DeckRepository {
       }));
     return Deck.restore(
       new DeckId(id),
+      String(row['owner_id']),
       {
         name: String(row['name']),
         version: String(row['version']),

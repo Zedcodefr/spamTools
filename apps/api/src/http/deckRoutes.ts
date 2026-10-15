@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.js';
+import { accountOf } from './authentication.js';
 
 const slotsSchema = {
   type: 'array',
@@ -52,20 +53,22 @@ interface AnalysisBody {
 export async function deckRoutes(app: FastifyInstance, { container }: { container: Container }): Promise<void> {
   const { language } = container.config;
 
-  app.get('/api/decks', () => container.listDecks.execute());
+  app.get('/api/decks', (request) => container.listDecks.execute({ ownerId: accountOf(request).id }));
 
   app.post<{ Body: DeckBody }>('/api/decks', { schema: { body: deckBody } }, async (request, reply) =>
-    reply.code(201).send(await container.saveDeck.execute({ ...request.body, language })),
+    reply.code(201).send(await container.saveDeck.execute({ ...request.body, language, ownerId: accountOf(request).id })),
   );
 
-  app.get<{ Params: { id: string } }>('/api/decks/:id', (request) => container.getDeck.execute({ id: request.params.id }));
+  app.get<{ Params: { id: string } }>('/api/decks/:id', (request) =>
+    container.getDeck.execute({ id: request.params.id, ownerId: accountOf(request).id }),
+  );
 
   app.put<{ Params: { id: string }; Body: DeckBody }>('/api/decks/:id', { schema: { body: deckBody } }, (request) =>
-    container.saveDeck.execute({ ...request.body, id: request.params.id, language }),
+    container.saveDeck.execute({ ...request.body, id: request.params.id, language, ownerId: accountOf(request).id }),
   );
 
   app.delete<{ Params: { id: string } }>('/api/decks/:id', async (request, reply) => {
-    await container.deleteDeck.execute({ id: request.params.id });
+    await container.deleteDeck.execute({ id: request.params.id, ownerId: accountOf(request).id });
     return reply.code(204).send();
   });
 

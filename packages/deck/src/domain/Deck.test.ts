@@ -14,30 +14,30 @@ const content = (slots: { cardId: string; talentSlot: number | null }[]) => ({
 
 describe('Deck', () => {
   it('accepte jusqu’à 4 cartes distinctes avec un talent chacune', () => {
-    const deck = Deck.create(content([1, 2, 3, 4].map((n) => ({ cardId: `c${n}`, talentSlot: 1 }))), NOW);
+    const deck = Deck.create('compte', content([1, 2, 3, 4].map((n) => ({ cardId: `c${n}`, talentSlot: 1 }))), NOW);
     assert.equal(deck.slots.length, 4);
   });
 
   it('accepte une carte sans talent', () => {
-    assert.equal(Deck.create(content([{ cardId: 'c1', talentSlot: null }]), NOW).slots[0]?.talentSlot, null);
+    assert.equal(Deck.create('compte', content([{ cardId: 'c1', talentSlot: null }]), NOW).slots[0]?.talentSlot, null);
   });
 
   it('refuse plus de 4 cartes, un doublon, un talent invalide ou un nom vide', () => {
-    assert.throws(() => Deck.create(content([1, 2, 3, 4, 5].map((n) => ({ cardId: `c${n}`, talentSlot: 1 }))), NOW), DomainError);
-    assert.throws(() => Deck.create(content([{ cardId: 'c1', talentSlot: 1 }, { cardId: 'c1', talentSlot: 2 }]), NOW), /qu’une fois/);
-    assert.throws(() => Deck.create(content([{ cardId: 'c1', talentSlot: 0 }]), NOW), DomainError);
-    assert.throws(() => Deck.create({ ...content([]), name: '  ' }, NOW), /nom/);
+    assert.throws(() => Deck.create('compte', content([1, 2, 3, 4, 5].map((n) => ({ cardId: `c${n}`, talentSlot: 1 }))), NOW), DomainError);
+    assert.throws(() => Deck.create('compte', content([{ cardId: 'c1', talentSlot: 1 }, { cardId: 'c1', talentSlot: 2 }]), NOW), /qu’une fois/);
+    assert.throws(() => Deck.create('compte', content([{ cardId: 'c1', talentSlot: 0 }]), NOW), DomainError);
+    assert.throws(() => Deck.create('compte', { ...content([]), name: '  ' }, NOW), /nom/);
   });
 
   it('accepte un DPS parmi ses cartes, et le refuse sinon', () => {
     const slots = [{ cardId: 'c1', talentSlot: 1 }];
-    assert.equal(Deck.create({ ...content(slots), dpsCardId: 'c1' }, NOW).dpsCardId, 'c1');
-    assert.equal(Deck.create(content(slots), NOW).dpsCardId, null);
-    assert.throws(() => Deck.create({ ...content(slots), dpsCardId: 'c9' }, NOW), /DPS/);
+    assert.equal(Deck.create('compte', { ...content(slots), dpsCardId: 'c1' }, NOW).dpsCardId, 'c1');
+    assert.equal(Deck.create('compte', content(slots), NOW).dpsCardId, null);
+    assert.throws(() => Deck.create('compte', { ...content(slots), dpsCardId: 'c9' }, NOW), /DPS/);
   });
 
   it('met à jour son contenu et sa date de modification', () => {
-    const deck = Deck.create(content([]), NOW);
+    const deck = Deck.create('compte', content([]), NOW);
     const later = new Date('2026-10-15T12:00:00Z');
     deck.update({ ...content([{ cardId: 'c1', talentSlot: 2 }]), name: 'Eau' }, later);
     assert.equal(deck.name, 'Eau');

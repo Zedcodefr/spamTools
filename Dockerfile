@@ -19,6 +19,7 @@ COPY packages/database/package.json packages/database/
 COPY packages/card-catalog/package.json packages/card-catalog/
 COPY packages/deck/package.json packages/deck/
 COPY packages/collection/package.json packages/collection/
+COPY packages/identity/package.json packages/identity/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY . .

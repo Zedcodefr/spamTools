@@ -8,6 +8,23 @@ import {
 } from '@spamtools/card-catalog';
 import { FileSystemAssetStore, SpamGameCatalogSource } from '@spamtools/card-catalog/infrastructure';
 import { GetCollection, SetCardsOwned } from '@spamtools/collection';
+import {
+  Authenticate,
+  BootstrapAdmin,
+  ChangePassword,
+  CreateAccount,
+  DeleteAccount,
+  InspectPasswordLink,
+  IssuePasswordReset,
+  ListAccounts,
+  Login,
+  Logout,
+  LogoutEverywhere,
+  RedeemPasswordLink,
+  UpdateAccount,
+  type IdentityDependencies,
+} from '@spamtools/identity';
+import { CryptoSecretTokens, ScryptPasswordHasher } from '@spamtools/identity/infrastructure';
 import { MigrateDatabase } from '@spamtools/database';
 import { AnalyzeDeck, DeleteDeck, GetDeck, ListDecks, SaveDeck, SuggestDecks } from '@spamtools/deck';
 import { SqlMigrationSource, SqliteDatabase, SqliteMigrationJournal } from '@spamtools/database/infrastructure';
@@ -15,6 +32,12 @@ import { SqliteCatalogRepository } from './adapters/catalog/SqliteCatalogReposit
 import { SqliteCollectionRepository } from './adapters/collection/SqliteCollectionRepository.js';
 import { CatalogDeckCardStatsProvider } from './adapters/deck/CatalogDeckCardStatsProvider.js';
 import { SqliteDeckRepository } from './adapters/deck/SqliteDeckRepository.js';
+import {
+  claimOrphanData,
+  SqliteAccountRepository,
+  SqlitePasswordLinkRepository,
+  SqliteSessionRepository,
+} from './adapters/identity/SqliteIdentityRepositories.js';
 import type { AppConfig } from './config.js';
 import { migrations } from './migrations.js';
 
@@ -43,6 +66,17 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
   const deckCards = new CatalogDeckCardStatsProvider(catalogs);
   const collection = new SqliteCollectionRepository(database);
 
+  const accounts = new SqliteAccountRepository(database);
+  const sessions = new SqliteSessionRepository(database);
+  sessions.deleteExpired(new Date());
+  const identity: IdentityDependencies = {
+    accounts,
+    sessions,
+    passwordLinks: new SqlitePasswordLinkRepository(database),
+    hasher: new ScryptPasswordHasher(),
+    tokens: new CryptoSecretTokens(),
+  };
+
   return {
     config,
     syncCatalog,
@@ -58,6 +92,24 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     suggestDecks: new SuggestDecks(deckCards),
     getCollection: new GetCollection(collection),
     setCardsOwned: new SetCardsOwned(collection),
+    login: new Login(identity),
+    authenticate: new Authenticate(identity),
+    logout: new Logout(identity),
+    logoutEverywhere: new LogoutEverywhere(identity),
+    changePassword: new ChangePassword(identity),
+    inspectPasswordLink: new InspectPasswordLink(identity),
+    redeemPasswordLink: new RedeemPasswordLink(identity),
+    listAccounts: new ListAccounts(identity),
+    createAccount: new CreateAccount(identity),
+    updateAccount: new UpdateAccount(identity),
+    issuePasswordReset: new IssuePasswordReset(identity),
+    deleteAccount: new DeleteAccount(identity),
+    /** Ligne de commande : premier administrateur ; il reçoit les données d'avant les comptes. */
+    bootstrapAdmin: async (username: string) => {
+      const first = accounts.countAdmins() === 0;
+      const link = await new BootstrapAdmin(identity).execute({ username });
+      return { link, claimed: first ? claimOrphanData(database, link.account.id) : { decks: 0, cards: 0 } };
+    },
     close: () => database.close(),
   };
 }

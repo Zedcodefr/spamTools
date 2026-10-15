@@ -1,6 +1,7 @@
 # Déploiement. Préparer deploy/.env (voir deploy/.env.example), puis :
 #   docker compose --env-file deploy/.env up -d --build
 #   docker compose --env-file deploy/.env run --rm app sync --all
+#   docker compose --env-file deploy/.env run --rm app create-admin <identifiant>   (premier compte)
 # Démarrage automatique : « restart: unless-stopped » relance le conteneur au démarrage de Docker
 # (service docker activé au boot : systemctl enable docker).
 #
@@ -16,8 +17,10 @@ services:
     image: spamtools:latest
     restart: unless-stopped
     environment:
-      SPAMTOOLS_AUTH_USER: ${SPAMTOOLS_AUTH_USER:?définir SPAMTOOLS_AUTH_USER dans deploy/.env}
-      SPAMTOOLS_AUTH_PASSWORD_HASH: ${SPAMTOOLS_AUTH_PASSWORD_HASH:?définir SPAMTOOLS_AUTH_PASSWORD_HASH dans deploy/.env}
+      # Derrière un reverse proxy (nginx, Caddy) : adresse du client dans X-Forwarded-For.
+      SPAMTOOLS_TRUST_PROXY: "1"
+      # Adresse publique, pour les liens affichés par « create-admin ».
+      SPAMTOOLS_PUBLIC_URL: ${SPAMTOOLS_PUBLIC_URL:-}
     volumes:
       - spamtools-data:/data
     # Jamais 0.0.0.0 : l'application ne doit être joignable que par le reverse proxy.

@@ -1,5 +1,6 @@
 import type { DeckGateway, DeckToSave } from '../application/ports/DeckGateway.ts';
 import type { DeckAnalysis, DeckSlot, DeckSuggestion, DeckView, SuggestionObjective } from '../domain/Deck.ts';
+import { apiFetch } from './apiFetch.ts';
 
 /**
  * Adaptateur : implémente le port en appelant l'API (apps/api).
@@ -38,7 +39,7 @@ export class HttpDeckGateway implements DeckGateway {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await apiFetch(`${this.baseUrl}${path}`, {
       method,
       ...(body !== undefined && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     });

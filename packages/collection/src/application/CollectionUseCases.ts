@@ -5,15 +5,17 @@ export interface CollectionView {
   readonly cardIds: readonly string[];
 }
 
-export class GetCollection implements UseCase<void, CollectionView> {
+/** Collection d'un compte : chacun a la sienne. */
+export class GetCollection implements UseCase<{ readonly ownerId: string }, CollectionView> {
   constructor(private readonly repository: CollectionRepository) {}
 
-  async execute(): Promise<CollectionView> {
-    return { cardIds: (await this.repository.load()).cardIds };
+  async execute({ ownerId }: { readonly ownerId: string }): Promise<CollectionView> {
+    return { cardIds: (await this.repository.load(ownerId)).cardIds };
   }
 }
 
 export interface SetCardsOwnedInput {
+  readonly ownerId: string;
   readonly cardIds: readonly string[];
   readonly owned: boolean;
 }
@@ -23,10 +25,10 @@ export class SetCardsOwned implements UseCase<SetCardsOwnedInput, CollectionView
   constructor(private readonly repository: CollectionRepository) {}
 
   async execute(input: SetCardsOwnedInput): Promise<CollectionView> {
-    const collection = await this.repository.load();
+    const collection = await this.repository.load(input.ownerId);
     const changed = collection.set(input.cardIds, input.owned);
     if (changed.length > 0) {
-      await this.repository.saveChanges(changed, input.owned);
+      await this.repository.saveChanges(input.ownerId, changed, input.owned);
     }
     return { cardIds: collection.cardIds };
   }

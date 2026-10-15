@@ -1,0 +1,184 @@
+/* Connexion, lien de mot de passe, Mon compte, Administration. */
+
+.auth {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.auth__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(100%, 24rem);
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.auth__card h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.auth__card label,
+.account__form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.auth__card input,
+.account__form input {
+  width: 100%;
+  color: var(--text);
+}
+
+.auth__submit {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.auth__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.auth__error,
+.auth__success {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.auth__error {
+  background: rgb(255 92 92 / 0.12);
+  border: 1px solid rgb(255 92 92 / 0.5);
+}
+
+.auth__success {
+  background: rgb(92 255 160 / 0.1);
+  border: 1px solid rgb(92 255 160 / 0.45);
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.account__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  min-width: 0;
+}
+
+.account__panel h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.account__form {
+  max-width: 28rem;
+}
+
+.account__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+
+.account__facts dt {
+  color: var(--text-muted);
+}
+
+.account__facts dd {
+  margin: 0;
+}
+
+.account__actions,
+.admin__actions,
+.admin__link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin__create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.admin__create label {
+  flex: 1 1 10rem;
+}
+
+.admin__table-wrap {
+  overflow-x: auto;
+}
+
+.admin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin__table th,
+.admin__table td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin__table thead th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.admin__self {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.admin__danger:hover:not(:disabled) {
+  border-color: #ff5c5c;
+}
+
+.admin__link {
+  border-color: var(--accent);
+}
+
+.admin__link-row input {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.app__user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}

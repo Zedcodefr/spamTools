@@ -1,5 +1,5 @@
 # Caddy (profil « caddy » de compose.yaml) : certificat HTTPS automatique pour {$DOMAIN}.
-# Le mot de passe d'accès est vérifié par l'application elle-même (SPAMTOOLS_AUTH_*).
+# L'accès (comptes, connexion) est géré par l'application elle-même.
 {$DOMAIN} {
 	encode zstd gzip
 

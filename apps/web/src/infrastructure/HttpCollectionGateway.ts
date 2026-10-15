@@ -1,4 +1,5 @@
 import type { CollectionGateway } from '../application/ports/CollectionGateway.ts';
+import { apiFetch } from './apiFetch.ts';
 
 /**
  * Adaptateur : implémente le port en appelant l'API (apps/api).
@@ -19,7 +20,7 @@ export class HttpCollectionGateway implements CollectionGateway {
   }
 
   private async request(method: string, path: string, body?: unknown): Promise<{ cardIds: string[] }> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await apiFetch(`${this.baseUrl}${path}`, {
       method,
       ...(body !== undefined && { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     });
