@@ -125,6 +125,8 @@ les 4 cartes agissant à chaque tour :
 - AoE (passif, talent, mot-clé d'une capacité) : les cartes adjacentes à la cible reçoivent la part indiquée
   (20 / 40 / 80 %), 1,5 voisine en moyenne ; un soin de la carte ciblée par une attaque (Épine Médusine)
   soigne la carte adverse touchée et se déduit des dégâts ;
+- Inversement (talent de Blaze, Catixy, Poulpe Parleur, Amber) : les dégâts de la carte comptent comme des
+  soins et ses soins comme des dégâts, renforts de base compris ; Éternités ↔ Temporalités non chiffré ;
 - dégâts et soins : × précision × (1 + chance de critique × (multiplicateur − 1)) ; bonus élémentaires :
   toujours obtenus en entier, sans précision ni critique ; le critique n'est tenté que sur un coup qui
   touche, donc un bonus « en cas de coup critique » : × précision × chance de critique ;

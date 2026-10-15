@@ -80,6 +80,8 @@ export interface StatContribution {
   readonly echoBonus?: number | undefined;
   /** Passif AoE : toutes les capacités de la carte atteignent aussi les cartes adjacentes à la cible. */
   readonly adjacentShare?: number | undefined;
+  /** Passif Inversement : les dégâts de la carte deviennent des soins, et ses soins des dégâts. */
+  readonly invertsDamageAndHeal?: boolean | undefined;
   readonly startingBoosts: readonly Boost[];
   readonly boostsPerTurn: readonly Boost[];
   readonly unquantified: readonly { readonly source: string; readonly reason: string }[];
@@ -347,6 +349,7 @@ function simulate(
     cards.forEach((card, index) => {
       const cardBoosts = boosts[index] as CardBoosts;
       const boostOf = (element: string) => 1 + BONUS_RATE * card.bonusFactor * (stock[element] ?? 0);
+      const inverted = card.base.invertsDamageAndHeal === true || card.talent.invertsDamageAndHeal === true;
       abilities[index]?.forEach((ability, abilityIndex) => {
         const used = uses[index]?.[abilityIndex] ?? 0;
         const factor = successFactor(ability, cardBoosts) * usedNow(index, abilityIndex);
@@ -376,12 +379,19 @@ function simulate(
         const damageBase = ability.growth.damage * used + cardBoosts.baseDamage;
         const healBase = ability.growth.heal * used + cardBoosts.baseHeal;
         const cardTotals = perCard[index]!;
-        cardTotals.damage += effect(ability.damage, damageBase, damage, total);
-        cardTotals.singleTargetDamage += effect(ability.damage, damageBase, singleTargetDamage, single);
-        cardTotals.heal += effect(ability.heal, healBase, heal, total);
-        // Soin rendu à la carte adverse touchée : des dégâts en moins, dans l'élément du soin.
+        // Inversement : dégâts et soins échangés, chacun calculé comme avant (renforts de base compris).
+        const dealt = inverted ? ability.heal : ability.damage;
+        const dealtBase = inverted ? healBase : damageBase;
+        cardTotals.damage += effect(dealt, dealtBase, damage, total);
+        cardTotals.singleTargetDamage += effect(dealt, dealtBase, singleTargetDamage, single);
+        cardTotals.heal += effect(inverted ? ability.damage : ability.heal, inverted ? damageBase : healBase, heal, total);
+        // Soin rendu à la carte adverse touchée : des dégâts en moins, dans l'élément du soin
+        // (inversé : des dégâts en plus).
         const healed = ability.opponentHeal ?? [];
-        if (healed.length > 0) {
+        if (healed.length > 0 && inverted) {
+          cardTotals.damage += effect(healed, healBase, damage, total);
+          cardTotals.singleTargetDamage += effect(healed, healBase, singleTargetDamage, single);
+        } else if (healed.length > 0) {
           const given: Record<string, number> = {};
           const givenToOne: Record<string, number> = {};
           cardTotals.damage -= effect(healed, healBase, given, total);

@@ -106,6 +106,8 @@ export interface StatContribution {
    * adjacentes à la cible, à hauteur de cette part (0,2 : 20 %) ; absent : aucun.
    */
   readonly adjacentShare?: number;
+  /** Passif Inversement : les dégâts de la carte deviennent des soins, et ses soins des dégâts. */
+  readonly invertsDamageAndHeal?: boolean;
   /** Renforts obtenus une fois en début de partie, et à chaque tour. */
   readonly startingBoosts: readonly Boost[];
   readonly boostsPerTurn: readonly Boost[];

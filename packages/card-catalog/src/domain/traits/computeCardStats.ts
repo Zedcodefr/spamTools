@@ -100,6 +100,8 @@ export interface StatsContext {
 }
 
 const PUNCHING_BAG_KEY = 'sac de frappe';
+/** Passif « Inversement » : dégâts et soins de la carte échangés (Éternités et Temporalités aussi). */
+const INVERSION_KEY = 'inversement';
 /** Tox « Multiplicateur » : bonus élémentaires doublés pour les dégâts et soins de la carte. */
 const MULTIPLIER_KEY = 'multiplicateur';
 
@@ -121,6 +123,10 @@ export function computeCardStats(card: CardData, context: StatsContext): CardSta
     const adjacent = adjacentShareOf(skill.effect);
     if (adjacent !== undefined) {
       base.adjacentShare += adjacent;
+      continue;
+    }
+    if (context.keyOf(skill.name) === INVERSION_KEY) {
+      invert(base, skill.name);
       continue;
     }
     addPassive(base, context.keyOf(skill.name), skill.value, card, context);
@@ -329,6 +335,10 @@ function talentContribution(talent: Talent, card: CardData, context: StatsContex
     stats.adjacentShare += grantedAdjacent;
     return stats;
   }
+  if (granted?.key === INVERSION_KEY) {
+    invert(stats, talent.name);
+    return stats;
+  }
   if (granted !== undefined) {
     const perTurn = Number(/\(\+(\d+(?:[.,]\d+)?)\)/.exec(granted.description ?? '')?.[1]?.replace(',', '.') ?? 1);
     if (addPassive(stats, granted.key, perTurn, card, context)) {
@@ -390,6 +400,11 @@ function adjacentShareOf(description: string): number | undefined {
   return percent === undefined ? undefined : Number(percent.replace(',', '.')) / 100;
 }
 
+function invert(stats: Contribution, source: string): void {
+  stats.invertsDamageAndHeal = true;
+  stats.note(source, 'Éternités et Temporalités échangées : non chiffré');
+}
+
 /** Écho plafonné : à 100 %, la capacité se rejouerait sans fin. */
 const MAX_ECHO = 0.95;
 
@@ -439,6 +454,7 @@ class Contribution {
   readonly boostsPerTurn: Boost[] = [];
   echoBonus = 0;
   adjacentShare = 0;
+  invertsDamageAndHeal = false;
   private readonly amounts: Record<AmountField, Record<string, number>> = {
     resistances: {},
     allyResistances: {},
@@ -475,6 +491,7 @@ class Contribution {
       boostsPerTurn: this.boostsPerTurn,
       ...(this.echoBonus !== 0 && { echoBonus: this.echoBonus }),
       ...(this.adjacentShare !== 0 && { adjacentShare: Math.round(this.adjacentShare * 1000) / 1000 }),
+      ...(this.invertsDamageAndHeal && { invertsDamageAndHeal: true }),
       unquantified: [...this.notes.values()],
     };
   }

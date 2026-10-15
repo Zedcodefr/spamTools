@@ -37,7 +37,9 @@ const context: StatsContext = {
       ? { key: 'cœur de feu', label: 'Cœur de feu', description: 'Bonus Feu (+1) par tour de jeu' }
       : granted.grantsSkill === 'PunchingBag_C'
         ? { key: 'sac de frappe', label: 'Sac de frappe', description: null }
-        : granted.grantsSkill === 'Aoe_R'
+        : granted.grantsSkill === 'Inversement_R'
+          ? { key: 'inversement', label: 'Inversement', description: 'Les dégâts de cette carte deviennent des soins, ses Éternités des Temporalités, et inversement.' }
+          : granted.grantsSkill === 'Aoe_R'
           ? { key: 'aoe', label: 'AoE', description: 'Attaque et soigne les cibles adjacentes à hauteur de 40% des dégâts infligés' }
           : undefined,
   passiveElement: (key) => (key === 'cœur de feu' ? 'fire' : undefined),
@@ -152,6 +154,15 @@ describe('computeCardStats', () => {
     ]);
     assert.equal(all?.heal[0]?.targets, 4);
     assert.equal(one?.heal[0]?.targets, 1);
+  });
+
+  it('relève le passif Inversement donné par un talent', () => {
+    const result = stats({
+      talents: [talent(2, { name: 'Inversement', grantsSkill: 'Inversement_R', actions: [action('AddSInversement', 'other', null, 100)] })],
+    });
+    assert.equal(result.talents['2']?.invertsDamageAndHeal, true);
+    assert.equal(result.base.invertsDamageAndHeal, undefined);
+    assert.match(result.talents['2']?.unquantified[0]?.reason ?? '', /Éternités/);
   });
 
   it('repère un bonus réservé aux coups critiques', () => {

@@ -85,6 +85,16 @@ describe('analyzeDeck : résistances', () => {
 });
 
 describe('analyzeDeck : simulation', () => {
+  it('échange dégâts et soins d’une carte avec Inversement', () => {
+    const abilities = [ability({ damage: [line(10, 'fire')], heal: [line(4, 'water')] })];
+    const normal = analyzeDeck([cardStats('catixy', { abilities })], { turns: 1 });
+    assert.deepEqual([normal.totalDamagePerTurn, normal.totalHealPerTurn], [10, 4]);
+    const inverted = analyzeDeck([cardStats('catixy', { abilities }, { invertsDamageAndHeal: true })], { turns: 1 });
+    assert.deepEqual([inverted.totalDamagePerTurn, inverted.totalHealPerTurn], [4, 10]);
+    assert.deepEqual(inverted.damagePerTurn, { water: 4 });
+    assert.deepEqual(inverted.healPerTurn, { fire: 10 });
+  });
+
   it('ajoute l’AoE : les cartes adjacentes à la cible reçoivent leur part, 1,5 voisine en moyenne', () => {
     const shinobi = cardStats('shinobi', { abilities: [ability({ damage: [line(40)], adjacentShare: 0.2 })] });
     const analysis = analyzeDeck([shinobi], { turns: 1 });
