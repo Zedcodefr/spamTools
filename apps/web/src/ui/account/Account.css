@@ -182,3 +182,43 @@
   font-size: 0.875rem;
   color: var(--text-muted);
 }
+
+.login-dialog {
+  width: min(calc(100% - 2rem), 26rem);
+  padding: 1.25rem 1.5rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 1rem;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
+}
+
+.login-dialog::backdrop {
+  background: rgb(8 4 20 / 0.7);
+}
+
+.login-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.login-dialog p {
+  margin: 0 0 0.75rem;
+}
+
+.login-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.auth--overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  background: rgb(8 4 20 / 0.85);
+  backdrop-filter: blur(4px);
+}

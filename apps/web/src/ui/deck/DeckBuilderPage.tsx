@@ -13,6 +13,7 @@ import {
   type DeckView,
 } from '../../domain/Deck.ts';
 import { GameCard } from '../card/GameCard.tsx';
+import { useSession } from '../account/SessionContext.tsx';
 import { useGateways } from '../GatewaysContext.tsx';
 import { CardGallery } from '../spamdex/CardGallery.tsx';
 import type { CatalogData } from '../useCatalogData.ts';
@@ -34,6 +35,8 @@ interface DeckBuilderPageProps {
  */
 export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps) {
   const { decks: gateway } = useGateways();
+  const { account, requireAccount } = useSession();
+  const signedIn = account !== null;
   const [draft, setDraft] = useState<DeckDraft>(EMPTY_DRAFT);
   const [savedDecks, setSavedDecks] = useState<readonly DeckView[]>([]);
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
@@ -43,9 +46,14 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
   const cardsById = useMemo(() => new Map(data.cards.map((card) => [card.id, card])), [data.cards]);
   const inDeck = useMemo(() => new Set(draft.slots.map((slot) => slot.cardId)), [draft.slots]);
 
+  // Decks enregistrés : ceux du compte connecté ; aucun pour un visiteur.
   const refreshDecks = useCallback(() => {
+    if (!signedIn) {
+      setSavedDecks([]);
+      return;
+    }
     gateway.list().then(setSavedDecks, (error: unknown) => setMessage({ kind: 'error', text: String(error) }));
-  }, [gateway]);
+  }, [gateway, signedIn]);
   useEffect(refreshDecks, [refreshDecks]);
 
   const select = (card: Card) => {
@@ -58,6 +66,9 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
   };
 
   const save = async () => {
+    if (!requireAccount()) {
+      return;
+    }
     try {
       const name = draft.name.trim() || 'Deck sans nom';
       const saved = await gateway.save({ ...draft, name, version: data.catalog.version });
@@ -70,7 +81,7 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
   };
 
   const remove = async () => {
-    if (draft.id === null) {
+    if (draft.id === null || !requireAccount()) {
       return;
     }
     try {
@@ -116,6 +127,12 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
           <select
             aria-label="Decks enregistrés"
             value={draft.id ?? ''}
+            onMouseDown={(event) => {
+              if (!signedIn) {
+                event.preventDefault();
+                requireAccount();
+              }
+            }}
             onChange={(event) => {
               const deck = savedDecks.find((candidate) => candidate.id === event.target.value);
               if (deck === undefined) {

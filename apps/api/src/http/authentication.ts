@@ -15,12 +15,28 @@ declare module 'fastify' {
 export const SESSION_COOKIE = 'spamtools_session';
 
 /** Routes de l'API ouvertes sans connexion ; le front compilé (pages, scripts) l'est aussi. */
-const PUBLIC_API = new Set(['/api/health', '/api/auth/login', '/api/auth/password-link', '/api/auth/password-link/inspect']);
+const PUBLIC_API = new Set([
+  '/api/health',
+  '/api/auth/login',
+  '/api/auth/password-link',
+  '/api/auth/password-link/inspect',
+  // Consultation (SpamDex, détail des cartes, images) et analyse d'un deck non enregistré.
+  '/api/catalog',
+  '/api/cards',
+  '/api/card-layout',
+  '/api/decks/analysis',
+]);
+const PUBLIC_PREFIXES = ['/api/cards/', '/api/assets/'];
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+function isPublic(path: string): boolean {
+  return PUBLIC_API.has(path) || PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 /**
- * Contrôle d'accès : la session est lue dans un cookie HttpOnly ; toute l'API (images comprises)
- * exige une connexion, sauf les routes de connexion. Les requêtes qui modifient des données doivent
+ * Contrôle d'accès : la session est lue dans un cookie HttpOnly. Sans connexion, on consulte les cartes
+ * et on analyse un deck ; tout ce qui enregistre (decks, collection), la recherche de decks et les
+ * comptes exigent une connexion. Les requêtes qui modifient des données doivent
  * venir du site lui-même (cookie SameSite=Strict, et vérification de l'origine).
  */
 export function registerAuthentication(app: FastifyInstance, container: Container): void {
@@ -41,7 +57,7 @@ export function registerAuthentication(app: FastifyInstance, container: Containe
       request.account = authenticated?.account ?? null;
       request.sessionTokenHash = authenticated?.tokenHash ?? null;
     }
-    if (request.account === null && !PUBLIC_API.has(path)) {
+    if (request.account === null && !isPublic(path)) {
       throw new UnauthenticatedError();
     }
   });

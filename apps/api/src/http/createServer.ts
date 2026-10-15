@@ -52,7 +52,7 @@ export function createServer(container: Container, { logger = true }: { logger?:
   app.register(deckRoutes, { container });
   app.register(collectionRoutes, { container });
   if (container.config.webDirectory !== undefined) {
-    app.register(webRoutes, { webDirectory: container.config.webDirectory });
+    app.register(webRoutes, { webDirectory: container.config.webDirectory, container });
   }
   app.register(assetRoutes, { assetsDirectory: container.config.assetsDirectory });
 

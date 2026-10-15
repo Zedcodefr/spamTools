@@ -5,7 +5,7 @@ import { HttpCatalogGateway } from './infrastructure/HttpCatalogGateway.ts';
 import { HttpCollectionGateway } from './infrastructure/HttpCollectionGateway.ts';
 import { HttpDeckGateway } from './infrastructure/HttpDeckGateway.ts';
 import { AuthGate } from './ui/account/AuthGate.tsx';
-import { App } from './ui/App.tsx';
+import { SessionProvider } from './ui/account/SessionContext.tsx';
 import { GatewaysProvider, type Gateways } from './ui/GatewaysContext.tsx';
 import './ui/styles.css';
 
@@ -26,7 +26,9 @@ if (root === null) {
 createRoot(root).render(
   <StrictMode>
     <GatewaysProvider gateways={gateways}>
-      <AuthGate>{(session) => <App session={session} />}</AuthGate>
+      <SessionProvider>
+        <AuthGate />
+      </SessionProvider>
     </GatewaysProvider>
   </StrictMode>,
 );

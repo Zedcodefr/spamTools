@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Card } from '../domain/Card.ts';
 import { AccountPage } from './account/AccountPage.tsx';
 import { AdminPage } from './account/AdminPage.tsx';
-import type { Session } from './account/AuthGate.tsx';
+import { useSession } from './account/SessionContext.tsx';
 import { CardDetailProvider } from './card/CardDetailProvider.tsx';
 import { useCardDetail } from './card/CardDetailContext.tsx';
 import { CardEnvironmentProvider, type CardEnvironment } from './card/CardEnvironment.tsx';
@@ -14,13 +14,16 @@ import { useCatalogData } from './useCatalogData.ts';
 
 const CARD_PARAM = 'card';
 
-/** Pages de l'application, un chemin d'URL chacune ; l'administration est réservée aux administrateurs. */
+/**
+ * Pages de l'application, un chemin d'URL chacune, et leur titre d'onglet. « Mon compte » demande une
+ * connexion ; l'administration est réservée aux administrateurs.
+ */
 const TOOLS = [
-  { path: '/', label: 'SpamDex', adminOnly: false },
-  { path: '/collection', label: 'Mes cartes', adminOnly: false },
-  { path: '/deck', label: 'Deck builder', adminOnly: false },
-  { path: '/compte', label: 'Mon compte', adminOnly: false },
-  { path: '/admin', label: 'Administration', adminOnly: true },
+  { path: '/', label: 'SpamDex', title: 'SpamDex : toutes les cartes de Spam', access: 'all' },
+  { path: '/collection', label: 'Mes cartes', title: 'Mes cartes', access: 'all' },
+  { path: '/deck', label: 'Deck builder', title: 'Deck builder Spam', access: 'all' },
+  { path: '/compte', label: 'Mon compte', title: 'Mon compte', access: 'account' },
+  { path: '/admin', label: 'Administration', title: 'Administration', access: 'admin' },
 ] as const;
 
 type ToolPath = (typeof TOOLS)[number]['path'];
@@ -47,10 +50,14 @@ function useTool(): [ToolPath, (path: ToolPath) => void] {
   return [tool, navigate];
 }
 
-export function App({ session }: { session: Session }) {
+export function App() {
   const { catalog: gateway } = useGateways();
-  const isAdmin = session.account.role === 'admin';
-  const tools = TOOLS.filter((entry) => isAdmin || !entry.adminOnly);
+  const session = useSession();
+  const { account } = session;
+  const isAdmin = account?.role === 'admin';
+  const tools = TOOLS.filter(
+    (entry) => entry.access === 'all' || (entry.access === 'account' ? account !== null : isAdmin),
+  );
   const [version, setVersion] = useState<string>();
   const { state, retry } = useCatalogData(version);
   const [tool, navigate] = useTool();
@@ -64,7 +71,10 @@ export function App({ session }: { session: Session }) {
   );
 
   // La carte ouverte est reflétée dans l'URL (?card=<slug>) pour pouvoir partager le lien.
+  const [openCardName, setOpenCardName] = useState<string | null>(null);
+  useDocumentTitle(tool, openCardName);
   const syncUrl = useCallback((card: Card | null) => {
+    setOpenCardName(card?.name ?? null);
     const url = new URL(window.location.href);
     if (card === null) {
       url.searchParams.delete(CARD_PARAM);
@@ -94,16 +104,32 @@ export function App({ session }: { session: Session }) {
           ))}
         </nav>
         <div className="app__user">
-          <span>{session.account.username}</span>
-          <button type="button" onClick={() => void session.signOut()}>
-            Se déconnecter
-          </button>
+          {account === null ? (
+            <button type="button" className="app__login" onClick={session.goToLogin} disabled={session.checking}>
+              Se connecter
+            </button>
+          ) : (
+            <>
+              <span>{account.username}</span>
+              <button type="button" onClick={() => void session.signOut()}>
+                Se déconnecter
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       <main className="app__main">
-        {tool === '/compte' && <AccountPage session={session} />}
-        {tool === '/admin' && (isAdmin ? <AdminPage currentAccountId={session.account.id} /> : <p className="app__state">Réservé aux administrateurs.</p>)}
+        {tool === '/compte' &&
+          (account !== null ? <AccountPage session={{ ...session, account }} /> : <SignInRequired checking={session.checking} />)}
+        {tool === '/admin' &&
+          (account === null ? (
+            <SignInRequired checking={session.checking} />
+          ) : isAdmin ? (
+            <AdminPage currentAccountId={account.id} />
+          ) : (
+            <p className="app__state">Réservé aux administrateurs.</p>
+          ))}
         {!ACCOUNT_PAGES.has(tool) && state.status === 'loading' && <p className="app__state">Chargement des cartes…</p>}
         {!ACCOUNT_PAGES.has(tool) && state.status === 'error' && (
           <div className="app__state" role="alert">
@@ -137,6 +163,30 @@ export function App({ session }: { session: Session }) {
       </footer>
     </div>
   );
+}
+
+/** Page personnelle demandée sans être connecté. */
+function SignInRequired({ checking }: { checking: boolean }) {
+  const { goToLogin } = useSession();
+  if (checking) {
+    return <p className="app__state">Chargement…</p>;
+  }
+  return (
+    <div className="app__state">
+      <p>Vous devez vous connecter pour accéder à toutes les fonctionnalités.</p>
+      <button type="button" onClick={goToLogin}>
+        Se connecter
+      </button>
+    </div>
+  );
+}
+
+/** Titre de l'onglet : la carte ouverte, sinon la page (le serveur donne le même au chargement). */
+function useDocumentTitle(tool: ToolPath, cardName: string | null) {
+  useEffect(() => {
+    const page = TOOLS.find((entry) => entry.path === tool)?.title ?? 'spamTools';
+    document.title = cardName === null ? `${page} | spamTools` : `${cardName} : carte de Spam | spamTools`;
+  }, [tool, cardName]);
 }
 
 /** Ouvre au chargement la carte indiquée dans l'URL, le cas échéant. */

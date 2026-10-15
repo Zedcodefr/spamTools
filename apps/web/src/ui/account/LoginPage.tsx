@@ -4,7 +4,14 @@ import { useGateways } from '../GatewaysContext.tsx';
 import './Account.css';
 
 /** Connexion par identifiant et mot de passe. Les comptes sont créés par un administrateur. */
-export function LoginPage({ onSignedIn }: { onSignedIn: (account: Account) => void }) {
+interface LoginPageProps {
+  readonly onSignedIn: (account: Account) => void;
+  readonly onCancel: () => void;
+  /** Par-dessus l'application (qui garde son état). */
+  readonly overlay?: boolean;
+}
+
+export function LoginPage({ onSignedIn, onCancel, overlay = false }: LoginPageProps) {
   const { auth } = useGateways();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,10 +33,10 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (account: Account) => vo
   };
 
   return (
-    <div className="auth">
+    <div className={overlay ? 'auth auth--overlay' : 'auth'}>
       <form className="auth__card" onSubmit={submit}>
         <h1>spamTools</h1>
-        <p className="auth__hint">Connectez-vous pour accéder aux outils.</p>
+        <p className="auth__hint">Connectez-vous pour enregistrer vos decks, votre collection et chercher les meilleurs decks.</p>
         <label>
           Identifiant
           <input
@@ -61,6 +68,9 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (account: Account) => vo
           {pending ? 'Connexion…' : 'Se connecter'}
         </button>
         <p className="auth__hint">Pas de compte, ou mot de passe oublié ? Demandez un lien à un administrateur.</p>
+        <button type="button" onClick={onCancel}>
+          Continuer sans compte
+        </button>
       </form>
     </div>
   );

@@ -36,14 +36,37 @@ describe('API : connexion et comptes', () => {
     return { inject: await signInAs(app, created.json().token), id: created.json().account.id as string };
   };
 
-  it('exige une connexion pour toute l’API, images comprises ; la sonde de santé reste ouverte', async () => {
-    for (const url of ['/api/catalog', '/api/cards', '/api/decks', '/api/collection', '/api/assets/img/x.webp', '/api/auth/me']) {
-      const response = await app.inject({ method: 'GET', url });
-      assert.equal(response.statusCode, 401, url);
+  it('laisse consulter les cartes et analyser un deck sans connexion', async () => {
+    for (const url of ['/api/health', '/api/catalog', '/api/cards', `/api/cards/${FIRE_SPIRIT}`, '/api/card-layout']) {
+      assert.equal((await app.inject({ method: 'GET', url })).statusCode, 200, url);
+    }
+    // Image absente : 404, pas 401.
+    assert.equal((await app.inject({ method: 'GET', url: '/api/assets/img/x.webp' })).statusCode, 404);
+    const analysis = await app.inject({
+      method: 'POST',
+      url: '/api/decks/analysis',
+      payload: { version: '1.10', slots: [{ cardId: FIRE_SPIRIT, talentSlot: null }] },
+    });
+    assert.equal(analysis.statusCode, 200);
+    // Un cookie inventé ne gêne pas la consultation.
+    assert.equal((await app.inject({ method: 'GET', url: '/api/cards', cookies: { [SESSION_COOKIE]: 'inventé' } })).statusCode, 200);
+  });
+
+  it('exige une connexion pour enregistrer, chercher un deck et gérer les comptes', async () => {
+    const requests = [
+      { method: 'GET', url: '/api/decks' },
+      { method: 'POST', url: '/api/decks', payload: { name: 'X', version: '1.10', slots: [] } },
+      { method: 'GET', url: '/api/collection' },
+      { method: 'PUT', url: '/api/collection/cards', payload: { cardIds: [FIRE_SPIRIT], owned: true } },
+      { method: 'POST', url: '/api/decks/suggestions', payload: { version: '1.10', slots: [], damage: 'total', healWeight: 0 } },
+      { method: 'GET', url: '/api/auth/me' },
+      { method: 'GET', url: '/api/admin/accounts' },
+    ] as const;
+    for (const request of requests) {
+      const response = await app.inject(request);
+      assert.equal(response.statusCode, 401, request.url);
       assert.deepEqual(response.json(), { error: 'Connexion requise' });
     }
-    assert.equal((await app.inject({ method: 'GET', url: '/api/health' })).statusCode, 200);
-    assert.equal((await app.inject({ method: 'GET', url: '/api/cards', cookies: { [SESSION_COOKIE]: 'inventé' } })).statusCode, 401);
   });
 
   it('connecte avec un cookie HttpOnly, Secure, SameSite=Strict ; la déconnexion ferme la session', async () => {

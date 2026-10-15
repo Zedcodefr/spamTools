@@ -12,6 +12,8 @@ export interface AppConfig {
   readonly secureCookies?: boolean | undefined;
   /** Derrière un reverse proxy : l'adresse du client est lue dans X-Forwarded-For (limitation des tentatives). */
   readonly trustProxy?: boolean | undefined;
+  /** Adresse publique du site (https://spamtools.fr) : URL canoniques, sitemap, liens d'invitation. */
+  readonly publicUrl?: string | undefined;
 }
 
 /** Par défaut : dossier `data/` à la racine du dépôt (ignoré par git). */
@@ -31,5 +33,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     assetsDirectory: path.join(dataDirectory, 'assets'),
     secureCookies: flag('SPAMTOOLS_SECURE_COOKIES', env['NODE_ENV'] === 'production'),
     trustProxy: flag('SPAMTOOLS_TRUST_PROXY', false),
+    ...(env['SPAMTOOLS_PUBLIC_URL'] && { publicUrl: env['SPAMTOOLS_PUBLIC_URL'].replace(/\/+$/, '') }),
   };
 }

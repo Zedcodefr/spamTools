@@ -125,3 +125,11 @@ button:disabled {
 .app__footer a {
   color: inherit;
 }
+
+/* Contenu servi sans JavaScript (référencement, voir apps/api/src/http/seo.ts). */
+.noscript {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+  line-height: 1.5;
+}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Card } from '../../domain/Card.ts';
 import type { DeckDraft, DeckSuggestion, SuggestionObjective } from '../../domain/Deck.ts';
 import { useCollection } from '../collection/useCollection.ts';
+import { useSession } from '../account/SessionContext.tsx';
 import { useGateways } from '../GatewaysContext.tsx';
 
 const number = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
@@ -29,10 +30,14 @@ export function DeckSuggestions({ version, draft, turns, cardsById, onApply }: D
   const [objective, setObjective] = useState<SuggestionObjective>({ damage: 'total', healWeight: 0 });
   const [state, setState] = useState<State>({ status: 'idle' });
   const { owned } = useCollection();
+  const { requireAccount } = useSession();
   const [onlyOwned, setOnlyOwned] = useState(false);
   const ownedCount = owned === null ? 0 : [...cardsById.keys()].filter((id) => owned.has(id)).length;
 
   const search = async () => {
+    if (!requireAccount()) {
+      return;
+    }
     setState({ status: 'loading' });
     try {
       // Uniquement mes cartes : on exclut celles qu'on ne possède pas (les cartes déjà placées restent).

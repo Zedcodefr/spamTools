@@ -160,8 +160,11 @@ cartes » limite l'autocomplétion aux cartes possédées.
 
 ## Comptes (`/compte`, `/admin`)
 
-Le site est privé : toute l'API (images comprises) exige une connexion, seules la sonde `/api/health` et les
-routes de connexion sont ouvertes. Chaque compte a ses propres decks et sa propre collection.
+Le site se consulte **sans compte** : SpamDex, détail des cartes, composition et analyse d'un deck. Les
+actions personnelles demandent une connexion : enregistrer ou ouvrir un deck, « Mes cartes », la recherche du
+meilleur deck (coûteuse en calcul), les comptes. Sans compte, elles ouvrent la fenêtre « Vous devez vous
+connecter pour accéder à toutes les fonctionnalités » ; la connexion (`/connexion`) s'affiche par-dessus le
+site, un deck en cours n'est pas perdu. Chaque compte a ses propres decks et sa propre collection.
 
 - **Création par un administrateur**, sans mot de passe : il reçoit un **lien d'invitation**
   (`/mot-de-passe#<jeton>`, une seule fois, 3 jours) à transmettre au titulaire, qui choisit le sien. Le jeton
@@ -182,6 +185,23 @@ dans un cookie `HttpOnly`, `Secure` (production), `SameSite=Strict`, dont seule 
 modifications refusées si elles viennent d'un autre site (origine vérifiée) ; 10 tentatives par minute et
 par adresse sur la connexion, les liens et le changement de mot de passe (`@fastify/rate-limit`) ; message
 d'échec identique que l'identifiant existe ou non.
+
+## Référencement
+
+Le front est une application React : le serveur complète `index.html` pour chaque URL (`apps/api/src/http/seo.ts`)
+afin que les robots qui n'exécutent pas JavaScript lisent la page :
+
+- titre, description, URL canonique, `robots`, Open Graph et Twitter ; données structurées JSON-LD
+  (`WebSite`, `WebApplication`, fil d'Ariane des cartes) ;
+- une page par carte (`/?card=<slug>`) : titre « <carte> : carte <rareté> <élément> de Spam », description
+  tirée de ses capacités ;
+- un contenu `<noscript>` : liste des cartes (accueil), capacités, talents, histoire et artiste (carte) ;
+- `/robots.txt` (pages de compte et API exclues, images autorisées) et `/sitemap.xml` (accueil, deck builder,
+  chaque carte), générés depuis le catalogue ; pages de compte en `noindex`.
+
+`SPAMTOOLS_PUBLIC_URL` donne l'adresse des URL canoniques et du sitemap. Pas d'image Open Graph : les
+illustrations des cartes doivent être créditées et le logo du jeu n'est pas utilisable (conditions
+d'utilisation des données).
 
 ## Déploiement (Docker)
 

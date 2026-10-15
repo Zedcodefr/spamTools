@@ -96,9 +96,11 @@ export async function deckRoutes(app: FastifyInstance, { container }: { containe
   );
 
   // Analyse d'une composition, enregistrée ou non (POST : la composition est dans le corps).
+  // Ouverte sans connexion : limitée par adresse.
   app.post<{ Body: AnalysisBody }>(
     '/api/decks/analysis',
     {
+      config: { rateLimit: { max: 120, timeWindow: '1 minute' } },
       schema: {
         body: {
           type: 'object',

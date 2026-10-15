@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { ROLE_LABELS } from '../../domain/Account.ts';
 import { useGateways } from '../GatewaysContext.tsx';
-import type { Session } from './AuthGate.tsx';
+import type { Session } from './SessionContext.tsx';
 import { PasswordFields, passwordProblem } from './PasswordFields.tsx';
 import './Account.css';
 
 /** Mon compte : changer de mot de passe, se déconnecter de tous ses appareils. */
-export function AccountPage({ session }: { session: Session }) {
+export function AccountPage({ session }: { session: Session & { readonly account: NonNullable<Session['account']> } }) {
   const { auth } = useGateways();
   const [current, setCurrent] = useState('');
   const [password, setPassword] = useState('');

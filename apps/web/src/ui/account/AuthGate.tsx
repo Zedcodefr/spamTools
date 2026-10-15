@@ -1,84 +1,55 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { Account } from '../../domain/Account.ts';
-import { SESSION_LOST_EVENT } from '../../infrastructure/apiFetch.ts';
-import { useGateways } from '../GatewaysContext.tsx';
+import { useEffect, useState } from 'react';
+import { App } from '../App.tsx';
+import { NAVIGATE_EVENT, navigateTo } from '../navigation.ts';
 import { LoginPage } from './LoginPage.tsx';
 import { PasswordLinkPage, PASSWORD_LINK_PATH } from './PasswordLinkPage.tsx';
-
-type AuthState =
-  | { readonly status: 'loading' }
-  | { readonly status: 'error'; readonly message: string }
-  | { readonly status: 'signedOut' }
-  | { readonly status: 'signedIn'; readonly account: Account };
-
-export interface Session {
-  readonly account: Account;
-  readonly signOut: () => Promise<void>;
-  /** Après « se déconnecter partout » : la session en cours est fermée aussi. */
-  readonly sessionClosed: () => void;
-}
+import { LOGIN_PATH, useSession } from './SessionContext.tsx';
 
 /**
- * Garde de connexion : l'application n'est affichée qu'au compte connecté ; sinon la page de
- * connexion, ou celle du lien de mot de passe (invitation, réinitialisation).
+ * Pages de connexion (/connexion, /mot-de-passe#jeton) ; toutes les autres sont l'application,
+ * consultable sans compte. La connexion s'affiche par-dessus l'application, qui reste montée : un
+ * deck en cours de composition n'est pas perdu.
  */
-export function AuthGate({ children }: { children: (session: Session) => ReactNode }) {
-  const { auth } = useGateways();
-  const [state, setState] = useState<AuthState>({ status: 'loading' });
-  const [onLinkPage, setOnLinkPage] = useState(() => window.location.pathname === PASSWORD_LINK_PATH);
+export function AuthGate() {
+  const session = useSession();
+  const [path, setPath] = useState(() => window.location.pathname);
 
-  const load = useCallback(() => {
-    setState({ status: 'loading' });
-    auth.me().then(
-      (account) => setState(account === null ? { status: 'signedOut' } : { status: 'signedIn', account }),
-      (cause: unknown) => setState({ status: 'error', message: cause instanceof Error ? cause.message : String(cause) }),
-    );
-  }, [auth]);
-
-  useEffect(load, [load]);
-
-  // Session expirée ou fermée ailleurs : retour à la connexion.
   useEffect(() => {
-    const onLost = () => setState({ status: 'signedOut' });
-    window.addEventListener(SESSION_LOST_EVENT, onLost);
-    return () => window.removeEventListener(SESSION_LOST_EVENT, onLost);
+    const update = () => setPath(window.location.pathname);
+    window.addEventListener('popstate', update);
+    window.addEventListener(NAVIGATE_EVENT, update);
+    return () => {
+      window.removeEventListener('popstate', update);
+      window.removeEventListener(NAVIGATE_EVENT, update);
+    };
   }, []);
 
-  const signedIn = useCallback((account: Account) => setState({ status: 'signedIn', account }), []);
-
-  if (onLinkPage) {
+  if (path === PASSWORD_LINK_PATH) {
     return (
       <PasswordLinkPage
         onDone={(account) => {
+          session.signedIn(account);
           window.history.replaceState(null, '', '/');
-          setOnLinkPage(false);
-          signedIn(account);
+          setPath('/');
         }}
       />
     );
   }
-  switch (state.status) {
-    case 'loading':
-      return <p className="app__state">Chargement…</p>;
-    case 'error':
-      return (
-        <div className="app__state" role="alert">
-          <p>Impossible de joindre le serveur : {state.message}</p>
-          <button type="button" onClick={load}>
-            Réessayer
-          </button>
-        </div>
-      );
-    case 'signedOut':
-      return <LoginPage onSignedIn={signedIn} />;
-    case 'signedIn':
-      return children({
-        account: state.account,
-        signOut: async () => {
-          await auth.logout().catch(() => undefined);
-          setState({ status: 'signedOut' });
-        },
-        sessionClosed: () => setState({ status: 'signedOut' }),
-      });
-  }
+  return (
+    <>
+      <div inert={path === LOGIN_PATH}>
+        <App />
+      </div>
+      {path === LOGIN_PATH && (
+        <LoginPage
+          overlay
+          onSignedIn={(account) => {
+            session.signedIn(account);
+            navigateTo(session.takeReturnPath());
+          }}
+          onCancel={() => navigateTo(session.takeReturnPath())}
+        />
+      )}
+    </>
+  );
 }

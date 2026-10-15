@@ -22,7 +22,10 @@ describe('API catalogue', () => {
     directory = await mkdtemp(path.join(tmpdir(), 'spamtools-api-'));
     const web = path.join(directory, 'web');
     await mkdir(path.join(web, 'assets'), { recursive: true });
-    await writeFile(path.join(web, 'index.html'), '<!doctype html><title>spamTools</title>');
+    await writeFile(
+      path.join(web, 'index.html'),
+      '<!doctype html><html><head><!--seo:start--><title>spamTools</title><!--seo:end--></head><body><!--seo:body--><div id="root"></div></body></html>',
+    );
     await writeFile(path.join(web, 'assets', 'app-abc123.js'), 'console.log(1)');
     container = await createContainer(
       {
@@ -30,6 +33,7 @@ describe('API catalogue', () => {
         language: 'fr',
         assetsDirectory: path.join(directory, 'assets'),
         webDirectory: web,
+        publicUrl: 'https://spamtools.test',
       },
       { catalogSource: fakeSpamGameSource() },
     );
@@ -104,8 +108,42 @@ describe('API catalogue', () => {
       for (const url of ['/', '/deck', '/collection?x=1', '/../../package.json', '/%2e%2e/%2e%2e/package.json']) {
         const response = await get(url);
         assert.equal(response.statusCode, 200, url);
-        assert.match(response.body, /<title>spamTools<\/title>/, url);
+        assert.match(response.body, /<title>[^<]*spamTools<\/title>/, url);
       }
+    });
+
+    it('complète la page pour le référencement : titre, description, canonique, JSON-LD, contenu sans JavaScript', async () => {
+      const home = (await app.inject({ method: 'GET', url: '/' })).body;
+      assert.match(home, /<title>SpamDex : toutes les cartes de Spam, capacités et talents \| spamTools<\/title>/);
+      assert.match(home, /<meta name="description" content="Toutes les cartes du jeu Spam \(2 cartes, version 1\.10\)/);
+      assert.match(home, /<link rel="canonical" href="https:\/\/spamtools\.test\/" \/>/);
+      assert.match(home, /<meta name="robots" content="index, follow/);
+      assert.match(home, /<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@type":"WebSite"/);
+      assert.match(home, /<noscript><main class="noscript"><h1>SpamDex[^]*<a href="\/\?card=esprit_feu">Esprit Feu<\/a>/);
+      assert.match(home, /<div id="root"><\/div>/);
+
+      const card = (await app.inject({ method: 'GET', url: '/?card=esprit_feu' })).body;
+      assert.match(card, /<title>Esprit Feu : carte [^<]+ de Spam \| spamTools<\/title>/);
+      assert.match(card, /<link rel="canonical" href="https:\/\/spamtools\.test\/\?card=esprit_feu" \/>/);
+      assert.match(card, /"@type":"BreadcrumbList"/);
+      assert.match(card, /Illustration : Atto/);
+
+      // Pages de compte : jamais indexées ; carte inconnue : page d'accueil, sans reprendre le texte demandé.
+      const account = (await app.inject({ method: 'GET', url: '/compte' })).body;
+      assert.match(account, /<meta name="robots" content="noindex, nofollow" \/>/);
+      assert.doesNotMatch(account, /rel="canonical"/);
+      const injected = (await app.inject({ method: 'GET', url: '/?card=%3Cscript%3Ealert(1)%3C/script%3E' })).body;
+      assert.doesNotMatch(injected, /<script>alert/);
+    });
+
+    it('sert robots.txt et un sitemap des pages et des cartes', async () => {
+      const robots = await app.inject({ method: 'GET', url: '/robots.txt' });
+      assert.match(robots.body, /Disallow: \/api\/\nDisallow: \/compte/);
+      assert.match(robots.body, /Sitemap: https:\/\/spamtools\.test\/sitemap\.xml/);
+      const sitemap = await app.inject({ method: 'GET', url: '/sitemap.xml' });
+      assert.equal(sitemap.headers['content-type'], 'application/xml; charset=utf-8');
+      assert.match(sitemap.body, /<loc>https:\/\/spamtools\.test\/deck<\/loc>/);
+      assert.match(sitemap.body, /<loc>https:\/\/spamtools\.test\/\?card=hibernatus<\/loc>/);
     });
 
     it("laisse les routes /api inconnues en 404", async () => {
