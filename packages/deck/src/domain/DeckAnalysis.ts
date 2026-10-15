@@ -57,6 +57,10 @@ export interface AbilityModel {
   readonly critMultiplier: number;
   readonly damage: readonly EffectLine[];
   readonly heal: readonly EffectLine[];
+  /** Soin rendu à la carte adverse touchée : calculé comme un soin, déduit des dégâts (absent : aucun). */
+  readonly opponentHeal?: readonly EffectLine[] | undefined;
+  /** AoE propre à la capacité : part reçue par chaque carte adjacente à la cible. */
+  readonly adjacentShare?: number | undefined;
   readonly bonus: readonly EffectLine[];
   readonly cost: ElementAmounts;
   readonly growth: { readonly damage: number; readonly heal: number; readonly bonus: number };
@@ -72,6 +76,10 @@ export interface StatContribution {
   /** Éléments générés à chaque attaque subie (Sac de frappe). */
   readonly bonusPerHit: ElementAmounts;
   readonly startingBonus: ElementAmounts;
+  /** Chance d'Écho ajoutée à toutes les capacités de la carte (talent Roulette). */
+  readonly echoBonus?: number | undefined;
+  /** Passif AoE : toutes les capacités de la carte atteignent aussi les cartes adjacentes à la cible. */
+  readonly adjacentShare?: number | undefined;
   readonly startingBoosts: readonly Boost[];
   readonly boostsPerTurn: readonly Boost[];
   readonly unquantified: readonly { readonly source: string; readonly reason: string }[];
@@ -240,6 +248,11 @@ function simulate(
   const boosts: CardBoosts[] = cards.map(() => ({ ...NO_BOOSTS }));
   const uses = abilities.map((list) => list.map(() => 0));
   const schedules = abilities.map((list) => list.map((ability) => new CooldownSchedule(ability)));
+  const casts = abilities.map((list, index) => {
+    const card = cards[index] as DeckCardStats;
+    const echoBonus = (card.base.echoBonus ?? 0) + (card.talent.echoBonus ?? 0);
+    return list.map((ability) => castsWhenReady(ability.echoChance + echoBonus));
+  });
   const perCard = cards.map(() => ({ damage: 0, singleTargetDamage: 0, heal: 0, generated: 0 }));
   const unappliedTargeted = new Set<string>();
 
@@ -279,9 +292,10 @@ function simulate(
   const turns: TurnProjection[] = [];
 
   for (let turn = 1; turn <= turnCount; turn++) {
-    // Probabilité que chaque capacité soit prête, donc utilisée, à ce tour.
+    // Utilisations attendues de chaque capacité à ce tour : prête (recharge), puis rejouée par l'Écho.
     const ready = schedules.map((list) => list.map((schedule) => schedule.readyChance()));
-    const usedNow = (index: number, abilityIndex: number) => ready[index]?.[abilityIndex] ?? 0;
+    const usedNow = (index: number, abilityIndex: number) =>
+      (ready[index]?.[abilityIndex] ?? 0) * (casts[index]?.[abilityIndex] ?? 1);
 
     // 1. Renforts du tour. La chance de toucher de chaque capacité se lit sur les renforts acquis au
     // début du tour : le résultat ne dépend pas de l'ordre des cartes dans le deck.
@@ -352,11 +366,29 @@ function simulate(
           }
           return total;
         };
+        // AoE : chaque carte adjacente à la cible reçoit `adjacent` de l'effet. La carte visée
+        // (« cible unique ») n'en reçoit pas plus ; une cible au hasard ou une zone, si (voisines touchées).
+        const adjacent =
+          1 + ADJACENT_CARDS * ((ability.adjacentShare ?? 0) + (card.base.adjacentShare ?? 0) + (card.talent.adjacentShare ?? 0));
+        const total = (line: EffectLine) => line.targets * adjacent;
+        const single = (line: EffectLine) =>
+          line.targets === 1 && line.singleTarget === 1 ? 1 : line.singleTarget * adjacent;
         const damageBase = ability.growth.damage * used + cardBoosts.baseDamage;
+        const healBase = ability.growth.heal * used + cardBoosts.baseHeal;
         const cardTotals = perCard[index]!;
-        cardTotals.damage += effect(ability.damage, damageBase, damage, (line) => line.targets);
-        cardTotals.singleTargetDamage += effect(ability.damage, damageBase, singleTargetDamage, (line) => line.singleTarget);
-        cardTotals.heal += effect(ability.heal, ability.growth.heal * used + cardBoosts.baseHeal, heal, (line) => line.targets);
+        cardTotals.damage += effect(ability.damage, damageBase, damage, total);
+        cardTotals.singleTargetDamage += effect(ability.damage, damageBase, singleTargetDamage, single);
+        cardTotals.heal += effect(ability.heal, healBase, heal, total);
+        // Soin rendu à la carte adverse touchée : des dégâts en moins, dans l'élément du soin.
+        const healed = ability.opponentHeal ?? [];
+        if (healed.length > 0) {
+          const given: Record<string, number> = {};
+          const givenToOne: Record<string, number> = {};
+          cardTotals.damage -= effect(healed, healBase, given, total);
+          cardTotals.singleTargetDamage -= effect(healed, healBase, givenToOne, single);
+          addInto(damage, scale(given, -1));
+          addInto(singleTargetDamage, scale(givenToOne, -1));
+        }
         // Croissance « après utilisation » : comptée à partir de l'utilisation suivante.
         uses[index]![abilityIndex] = used + usedNow(index, abilityIndex);
       });
@@ -423,36 +455,41 @@ function simulate(
 }
 
 /**
- * Calendrier d'une capacité, en probabilités : `remaining[k]` = probabilité qu'il reste k tours
- * avant qu'elle soit prête (0 : prête ce tour). Départ : prête au tour N (recharge N).
- * Après utilisation : prête au tour suivant avec la chance d'Écho, sinon N tours plus tard.
+ * Calendrier d'une capacité : prête au tour N (recharge N), puis N tours après chaque utilisation.
+ * L'Écho ne change pas ce calendrier : la capacité se rejoue dans le même tour (castsWhenReady).
  */
 class CooldownSchedule {
-  private remaining: number[];
+  private turn = 1;
   private readonly cooldown: number;
-  private readonly echo: number;
 
   constructor(ability: AbilityModel) {
     this.cooldown = Math.max(1, Math.round(ability.cooldown));
-    this.echo = Math.min(1, Math.max(0, ability.echoChance));
-    this.remaining = Array.from({ length: this.cooldown }, (_, k) => (k === this.cooldown - 1 ? 1 : 0));
   }
 
   readyChance(): number {
-    return this.remaining[0] ?? 0;
+    return this.turn % this.cooldown === 0 ? 1 : 0;
   }
 
-  /** Fin du tour : la capacité prête est utilisée, les autres se rapprochent d'un tour. */
   endTurn(): void {
-    const used = this.readyChance();
-    const next = this.remaining.map(() => 0);
-    for (let k = 1; k < this.remaining.length; k++) {
-      next[k - 1] = (next[k - 1] ?? 0) + (this.remaining[k] ?? 0);
-    }
-    next[0] = (next[0] ?? 0) + used * this.echo;
-    next[this.cooldown - 1] = (next[this.cooldown - 1] ?? 0) + used * (1 - this.echo);
-    this.remaining = next;
+    this.turn++;
   }
+}
+
+/**
+ * Cartes adjacentes à la cible, en moyenne : 4 cartes en ligne, 1 voisine aux bords, 2 au milieu
+ * ((1 + 2 + 2 + 1) / 4).
+ */
+const ADJACENT_CARDS = 1.5;
+
+/** Écho plafonné : à 100 %, la capacité se rejouerait sans fin. */
+const MAX_ECHO = 0.95;
+
+/**
+ * Utilisations moyennes chaque fois que la capacité est prête : avec Écho, elle récupère sa recharge
+ * et se rejoue aussitôt, avec la même chance à chaque fois : 1 + p + p² + … = 1 / (1 − p).
+ */
+export function castsWhenReady(echoChance: number): number {
+  return 1 / (1 - Math.min(MAX_ECHO, Math.max(0, echoChance)));
 }
 
 /** Probabilité qu'une capacité touche : sa précision, renforts compris (plafonnée à 100 %). */

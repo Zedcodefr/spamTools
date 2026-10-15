@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DomainError } from '@spamtools/shared-kernel';
-import { analyzeDeck, type AbilityModel, type Boost, type DeckCardStats, type StatContribution } from './DeckAnalysis.js';
+import { analyzeDeck, castsWhenReady, type AbilityModel, type Boost, type DeckCardStats, type StatContribution } from './DeckAnalysis.js';
 import { Deck } from './Deck.js';
 
 const NOW = new Date('2026-10-14T12:00:00Z');
@@ -85,6 +85,53 @@ describe('analyzeDeck : résistances', () => {
 });
 
 describe('analyzeDeck : simulation', () => {
+  it('ajoute l’AoE : les cartes adjacentes à la cible reçoivent leur part, 1,5 voisine en moyenne', () => {
+    const shinobi = cardStats('shinobi', { abilities: [ability({ damage: [line(40)], adjacentShare: 0.2 })] });
+    const analysis = analyzeDeck([shinobi], { turns: 1 });
+    // 40 + 1,5 × 20 % × 40 = 52 ; la carte visée ne reçoit que 40.
+    assert.equal(analysis.totalDamagePerTurn, 52);
+    assert.equal(analysis.totalSingleTargetDamagePerTurn, 40);
+    // Passif de la carte + talent : s'appliquent à toutes ses capacités, soins compris ; zone : voisines touchées aussi.
+    const healer = cardStats(
+      'gardien',
+      { abilities: [ability({ heal: [line(10, 'light')], damage: [line(10, 'fire', 4, 1)] })], adjacentShare: 0.2 },
+      { adjacentShare: 0.4 },
+    );
+    const both = analyzeDeck([healer], { turns: 1 });
+    assert.equal(both.totalHealPerTurn, 19);
+    assert.equal(both.totalDamagePerTurn, 76);
+    assert.equal(both.totalSingleTargetDamagePerTurn, 19);
+  });
+
+  it('rejoue aussitôt une capacité à Écho, dans le même tour : 1 / (1 − écho) utilisations en moyenne', () => {
+    assert.equal(castsWhenReady(0), 1);
+    assert.equal(castsWhenReady(0.5), 2);
+    assert.ok(Math.abs(castsWhenReady(1) - 20) < 1e-9, 'plafonné à 95 %');
+    const panther = (echoChance: number, echoBonus?: number) =>
+      cardStats('panthere', { abilities: [ability({ echoChance, damage: [line(10)] })] }, echoBonus === undefined ? {} : { echoBonus });
+    // Recharge 1 : l'Écho n'attend pas le tour suivant, il ajoute des utilisations au tour.
+    assert.deepEqual(damageByTurn([panther(0.75)], 2), [40, 40]);
+    // Talent Roulette : +10 % d'Écho, ajouté à celui de la capacité.
+    assert.deepEqual(damageByTurn([panther(0.4, 0.1)], 1), [20]);
+    // Recharge 3 : 2 utilisations au tour 3, puis rien jusqu'au tour 6.
+    const whale = cardStats('baleine', { abilities: [ability({ cooldown: 3, echoChance: 0.5, damage: [line(35)] })] });
+    assert.deepEqual(damageByTurn([whale], 6), [0, 0, 70, 0, 0, 70]);
+  });
+
+  it('déduit des dégâts le soin rendu à la carte adverse touchée, renforcé par le stock de son élément', () => {
+    const medusine = cardStats('medusine', {
+      abilities: [ability({ damage: [line(18, 'water')], opponentHeal: [line(18, 'fire')] })],
+      startingBonus: { fire: 5 },
+    });
+    const analysis = analyzeDeck([medusine], { turns: 1 });
+    // 18 Eau − 18 Feu × (1 + 5 × 10 %) = −9
+    assert.equal(analysis.totalDamagePerTurn, -9);
+    assert.equal(analysis.totalSingleTargetDamagePerTurn, -9);
+    assert.deepEqual(analysis.damagePerTurn, { water: 18, fire: -27 });
+    assert.equal(analysis.totalHealPerTurn, 0);
+    assert.equal(analysis.cards[0]?.damagePerTurn, -9);
+  });
+
   it('applique précision, critique (multiplicateur) et recharge', () => {
     const cards = [
       cardStats('a', { abilities: [ability({ damage: [line(10)], precision: 50, critChance: 50, critMultiplier: 3 })] }),
@@ -104,14 +151,6 @@ describe('analyzeDeck : simulation', () => {
     const analysis = analyzeDeck(cards, { turns: 7 });
     assert.deepEqual(analysis.turns.map((turn) => turn.totalDamage), [0, 0, 30, 0, 0, 30, 0]);
     assert.deepEqual(analysis.turns.map((turn) => turn.totalHeal), [0, 0, 0, 0, 70, 0, 0]);
-  });
-
-  it('suit l’Écho en probabilité : prête au tour suivant avec sa chance', () => {
-    const cards = [cardStats('a', { abilities: [ability({ damage: [line(10)], cooldown: 3, echoChance: 0.5 })] })];
-    // Probabilité d'être prête : tour 3 : 1 ; tour 4 : 0,5 (Écho) ; tour 5 : 0,25 ;
-    // tour 6 : 0,5 (tour 3 sans Écho) + 0,125 (Écho aux tours 4 et 5) = 0,625 ;
-    // tour 7 : 0,25 (tour 4 sans Écho) + 0,3125 (Écho au tour 6) = 0,5625.
-    assert.deepEqual(damageByTurn(cards, 7), [0, 0, 10, 5, 2.5, 6.25, 5.63]);
   });
 
   it('distingue dégâts totaux et cible unique : zone, cibles au hasard', () => {

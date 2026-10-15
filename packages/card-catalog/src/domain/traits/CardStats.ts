@@ -68,6 +68,13 @@ export interface AbilityModel {
   readonly critMultiplier: number;
   readonly damage: readonly EffectLine[];
   readonly heal: readonly EffectLine[];
+  /**
+   * Soin rendu à la carte adverse touchée (« Soigne la carte ciblée » dans une capacité d'attaque,
+   * ex. Épine Médusine) : calculé comme un soin, il se déduit des dégâts.
+   */
+  readonly opponentHeal: readonly EffectLine[];
+  /** AoE propre à la capacité (mot-clé dans son texte) : part reçue par chaque carte adjacente à la cible. */
+  readonly adjacentShare?: number;
   readonly bonus: readonly EffectLine[];
   /** Éléments consommés par utilisation (« [Coût 10 Feu] »). */
   readonly cost: ElementAmounts;
@@ -92,6 +99,13 @@ export interface StatContribution {
   readonly bonusPerHit: ElementAmounts;
   /** Éléments obtenus une fois, en début de partie. */
   readonly startingBonus: ElementAmounts;
+  /** Chance d'Écho ajoutée à toutes les capacités de la carte (talent Roulette : 0,1) ; absent : aucune. */
+  readonly echoBonus?: number;
+  /**
+   * Passif AoE (tox de la carte, ou donné par un talent) : toutes ses capacités atteignent aussi les cartes
+   * adjacentes à la cible, à hauteur de cette part (0,2 : 20 %) ; absent : aucun.
+   */
+  readonly adjacentShare?: number;
   /** Renforts obtenus une fois en début de partie, et à chaque tour. */
   readonly startingBoosts: readonly Boost[];
   readonly boostsPerTurn: readonly Boost[];

@@ -1,4 +1,4 @@
-import type { Ability, CardAction, CardData } from '../Card.js';
+import type { Ability, CardAction, CardData, Talent } from '../Card.js';
 import type { CardElement, Keyword } from '../References.js';
 import type { CardTraits, CatalogTraits, SpecialAbility, TraitIcon } from './CardTraits.js';
 import { computeCardStats, type StatsContext } from './computeCardStats.js';
@@ -72,6 +72,8 @@ interface Vocabulary {
   readonly baseElements: ReadonlySet<string>;
   /** Mots-clés passifs/actifs indexés par identifiant sans préfixe ni rareté. */
   readonly passiveKeywordsByBaseId: Map<string, Keyword>;
+  /** Mots-clés par identifiant complet (« talent.TAoe_R ») : la rareté change parfois la valeur. */
+  readonly keywordsById: Map<string, Keyword>;
   /** Détection d'une capacité citée dans un texte d'effet, en mot entier. */
   readonly mentions: readonly { readonly key: string; readonly pattern: RegExp }[];
 }
@@ -137,7 +139,8 @@ function buildVocabulary(cards: readonly CardData[], keywords: readonly Keyword[
   );
   const baseElements = new Set(cards.flatMap((card) => Object.keys(card.resistances)));
 
-  return { byKey, elementByKey, baseElements, passiveKeywordsByBaseId, mentions };
+  const keywordsById = new Map(keywords.map((keyword) => [keyword.id, keyword]));
+  return { byKey, elementByKey, baseElements, passiveKeywordsByBaseId, keywordsById, mentions };
 }
 
 function buildStatsContext(elements: readonly CardElement[], vocabulary: Vocabulary): StatsContext {
@@ -145,13 +148,13 @@ function buildStatsContext(elements: readonly CardElement[], vocabulary: Vocabul
     baseElements: [...vocabulary.baseElements],
     elementIdByName: new Map(elements.map((element) => [normalize(element.name), element.id])),
     grantedPassive: (talent) => {
-      const keyword =
-        talent.grantsSkill === null ? undefined : vocabulary.passiveKeywordsByBaseId.get(baseId(talent.grantsSkill));
+      const keyword = grantedKeyword(talent, vocabulary);
       return keyword === undefined
         ? undefined
         : { key: specialAbilityKey(keyword.title), label: keyword.title, description: keyword.description };
     },
     passiveElement: (key) => vocabulary.elementByKey.get(key),
+    keywordDescription: (id) => vocabulary.keywordsById.get(id)?.description,
     keyOf: specialAbilityKey,
   };
 }
@@ -254,8 +257,7 @@ function analyzeCard(card: CardData, keywords: readonly Keyword[], vocabulary: V
 function naturalPassivesOf(card: CardData, vocabulary: Vocabulary): Set<string> {
   const labels = card.skills.map((skill) => skill.name);
   for (const talent of card.talents) {
-    const granted =
-      talent.grantsSkill === null ? undefined : vocabulary.passiveKeywordsByBaseId.get(baseId(talent.grantsSkill));
+    const granted = grantedKeyword(talent, vocabulary);
     if (granted !== undefined) {
       labels.push(granted.title);
     }
@@ -323,6 +325,17 @@ function categorySymbol(categoryId: string): string {
  * Identifiant sans préfixe ni rareté : "tox.Disparition", "Disparition_L" -> "Disparition" ;
  * "talent.TBrut", "Brut_R" -> "Brut".
  */
+/** Passif accordé par un talent : son mot-clé exact (« talent.TAoe_R »), sinon celui de même identifiant de base. */
+function grantedKeyword(talent: Talent, vocabulary: Vocabulary): Keyword | undefined {
+  if (talent.grantsSkill === null) {
+    return undefined;
+  }
+  return (
+    vocabulary.keywordsById.get(`talent.T${talent.grantsSkill}`) ??
+    vocabulary.passiveKeywordsByBaseId.get(baseId(talent.grantsSkill))
+  );
+}
+
 function baseId(id: string): string {
   return id
     .replace(/^(tox|ability)\./, '')

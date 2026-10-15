@@ -27,6 +27,8 @@ const TARGETING = {
 } as const;
 
 const BONUS_EFFECT = /^AddAllPlayerAttack/;
+/** Soin de toutes les cartes alliées (« Soigne 40 Lumière à toutes les cartes alliées »). */
+const ALL_ALLIES_HEAL = /soigne[^\n]*toutes les cartes alliees|cible toutes les cartes alliees\n[^\n]*soigne/;
 /** Bonus dont la valeur de base augmente à chaque utilisation (« La valeur de base du bonus augmente de 1 »). */
 const GROWING_BONUS_EFFECT = /^AddAllPlayerAttackCountActivation/;
 const CARD_ELEMENT_DAMAGE = 'DamageWithCardElement';
@@ -91,6 +93,8 @@ export interface StatsContext {
   grantedPassive(talent: Talent): PassiveGrant | undefined;
   /** Élément d'un passif élémentaire (« cœur de feu » -> fire). */
   passiveElement(key: string): string | undefined;
+  /** Description d'un mot-clé par son identifiant complet (« tox.Aoe »). */
+  keywordDescription(id: string): string | undefined;
   /** Clé de capacité particulière d'un nom affiché. */
   keyOf(label: string): string;
 }
@@ -114,6 +118,11 @@ export function computeCardStats(card: CardData, context: StatsContext): CardSta
     }
   }
   for (const skill of card.skills) {
+    const adjacent = adjacentShareOf(skill.effect);
+    if (adjacent !== undefined) {
+      base.adjacentShare += adjacent;
+      continue;
+    }
     addPassive(base, context.keyOf(skill.name), skill.value, card, context);
   }
 
@@ -138,6 +147,7 @@ function abilityModel(
   const text = normalize(ability.effect);
   const damage: EffectLine[] = [];
   const heal: EffectLine[] = [];
+  const opponentHeal: EffectLine[] = [];
   const bonus: EffectLine[] = [];
   const growth = { damage: 0, heal: 0, bonus: 0 };
   const boosts: Boost[] = [];
@@ -169,9 +179,12 @@ function abilityModel(
         damage.push(damageLine);
       }
     } else if (action.kind === 'heal') {
-      const healLine = line();
+      const healLine = line(ALL_ALLIES_HEAL.test(text) ? 'zone' : 'single');
       if (healLine === undefined) {
         notes.note(ability.name, 'soin sans élément : non compté dans les soins par élément');
+      } else if (healsOpponent(action, healsOnly, text)) {
+        opponentHeal.push(healLine);
+        notes.note(ability.name, 'soigne la carte adverse touchée : déduit des dégâts');
       } else {
         heal.push(healLine);
       }
@@ -207,6 +220,11 @@ function abilityModel(
     }
   }
 
+  // AoE propre à la capacité : mot-clé dans son texte (« {kw:tox.Aoe}AoE{/kw} »).
+  const adjacentShare = [...ability.effectRich.matchAll(/\{kw:([^}]+)\}/g)]
+    .map(([, id]) => adjacentShareOf(context.keywordDescription(id ?? '') ?? ''))
+    .reduce<number>((total, share) => total + (share ?? 0), 0);
+
   return {
     name: ability.name,
     cooldown: Math.max(1, ability.cooldown),
@@ -217,11 +235,21 @@ function abilityModel(
     critMultiplier: ability.critMultiplier,
     damage,
     heal,
+    opponentHeal,
+    ...(adjacentShare > 0 && { adjacentShare }),
     bonus,
     cost,
     growth,
     boosts,
   };
+}
+
+/**
+ * « Soigne » la carte ciblée (healTarget) dans une capacité qui attaque : la cible est la carte adverse
+ * touchée, sauf si le texte vise les alliées.
+ */
+function healsOpponent(action: CardAction, healsOnly: boolean, text: string): boolean {
+  return action.effect === 'healTarget' && !healsOnly && !/alli/.test(text);
 }
 
 /**
@@ -296,6 +324,11 @@ function addPassive(
 function talentContribution(talent: Talent, card: CardData, context: StatsContext): Contribution {
   const stats = new Contribution();
   const granted = context.grantedPassive(talent);
+  const grantedAdjacent = adjacentShareOf(granted?.description ?? '');
+  if (grantedAdjacent !== undefined) {
+    stats.adjacentShare += grantedAdjacent;
+    return stats;
+  }
   if (granted !== undefined) {
     const perTurn = Number(/\(\+(\d+(?:[.,]\d+)?)\)/.exec(granted.description ?? '')?.[1]?.replace(',', '.') ?? 1);
     if (addPassive(stats, granted.key, perTurn, card, context)) {
@@ -307,6 +340,11 @@ function talentContribution(talent: Talent, card: CardData, context: StatsContex
   const conditional = CONDITION.test(text);
   const everyTurn = EVERY_TURN.test(text);
   let quantified = false;
+  const echo = /gagnent echo \((\d+(?:[.,]\d+)?) ?%\)/.exec(text)?.[1];
+  if (echo !== undefined) {
+    stats.echoBonus += Number(echo.replace(',', '.')) / 100;
+    return stats;
+  }
   for (const action of talent.actions) {
     const value = (action.min + action.max) / 2;
     if (action.effect === 'AddCardResistance' && action.element !== null) {
@@ -337,14 +375,23 @@ function talentContribution(talent: Talent, card: CardData, context: StatsContex
 }
 
 /**
- * Durée moyenne entre deux utilisations. Avec Écho, la capacité reste disponible
- * (prochain tour) avec la probabilité indiquée ; sinon elle attend sa recharge.
+ * Durée moyenne entre deux utilisations. Avec Écho, la capacité récupère sa recharge et se rejoue
+ * aussitôt, dans le même tour, avec la probabilité indiquée (et ainsi de suite) : en moyenne
+ * 1 / (1 − écho) utilisations chaque fois qu'elle est prête, puis sa recharge.
  */
 function expectedPeriod(ability: Ability): number {
-  const echo = ability.cooldownResetChance / 100;
-  const cooldown = Math.max(1, ability.cooldown);
-  return echo + (1 - echo) * cooldown;
+  const echo = Math.min(MAX_ECHO, ability.cooldownResetChance / 100);
+  return Math.max(1, ability.cooldown) * (1 - echo);
 }
+
+/** AoE : « Attaque et soigne les cibles adjacentes à hauteur de 20% des dégâts infligés » -> 0,2. */
+function adjacentShareOf(description: string): number | undefined {
+  const percent = /adjacentes a hauteur de (\d+(?:[.,]\d+)?) ?%/.exec(normalize(description))?.[1];
+  return percent === undefined ? undefined : Number(percent.replace(',', '.')) / 100;
+}
+
+/** Écho plafonné : à 100 %, la capacité se rejouerait sans fin. */
+const MAX_ECHO = 0.95;
 
 /**
  * Actions comptées et leur poids : toutes pour une capacité simple ; pour un « Choix »,
@@ -390,6 +437,8 @@ class Contribution {
   readonly abilities: AbilityModel[] = [];
   readonly startingBoosts: Boost[] = [];
   readonly boostsPerTurn: Boost[] = [];
+  echoBonus = 0;
+  adjacentShare = 0;
   private readonly amounts: Record<AmountField, Record<string, number>> = {
     resistances: {},
     allyResistances: {},
@@ -424,6 +473,8 @@ class Contribution {
       startingBonus: round(this.amounts.startingBonus),
       startingBoosts: this.startingBoosts,
       boostsPerTurn: this.boostsPerTurn,
+      ...(this.echoBonus !== 0 && { echoBonus: this.echoBonus }),
+      ...(this.adjacentShare !== 0 && { adjacentShare: Math.round(this.adjacentShare * 1000) / 1000 }),
       unquantified: [...this.notes.values()],
     };
   }

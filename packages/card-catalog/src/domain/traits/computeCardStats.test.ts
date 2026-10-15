@@ -37,8 +37,12 @@ const context: StatsContext = {
       ? { key: 'cœur de feu', label: 'Cœur de feu', description: 'Bonus Feu (+1) par tour de jeu' }
       : granted.grantsSkill === 'PunchingBag_C'
         ? { key: 'sac de frappe', label: 'Sac de frappe', description: null }
-        : undefined,
+        : granted.grantsSkill === 'Aoe_R'
+          ? { key: 'aoe', label: 'AoE', description: 'Attaque et soigne les cibles adjacentes à hauteur de 40% des dégâts infligés' }
+          : undefined,
   passiveElement: (key) => (key === 'cœur de feu' ? 'fire' : undefined),
+  keywordDescription: (id) =>
+    id === 'tox.Aoe' ? 'Attaque et soigne les cibles adjacentes à hauteur de 20% des dégâts infligés' : undefined,
   keyOf: (label) => label.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase(),
 };
 
@@ -63,7 +67,8 @@ describe('computeCardStats', () => {
     assert.deepEqual(first?.damage, [{ value: 15, elements: { fire: 1 }, targets: 1, singleTarget: 1, weight: 1, onCritOnly: false }]);
     assert.deepEqual(first?.bonus, [{ value: 2, elements: { water: 1 }, targets: 1, singleTarget: 1, weight: 1, onCritOnly: false }]);
     assert.deepEqual([first?.period, first?.precision, first?.critChance, first?.critMultiplier], [1, 50, 25, 3]);
-    assert.deepEqual([second?.cooldown, second?.echoChance, second?.period], [3, 0.5, 2]);
+    // Écho 50 % : rejouée aussitôt, 2 utilisations en moyenne tous les 3 tours.
+    assert.deepEqual([second?.cooldown, second?.echoChance, second?.period], [3, 0.5, 1.5]);
     assert.equal(second?.damage[0]?.targets, ENEMY_CARDS);
   });
 
@@ -97,6 +102,56 @@ describe('computeCardStats', () => {
         ?.bonus[0]?.elements,
       Object.fromEntries(BASE.map((element) => [element, 1 / 6])),
     );
+  });
+
+  it('range le soin de la carte ciblée par une attaque à part : il soigne la carte adverse touchée', () => {
+    const [medusine, allyHealer] = model([
+      ability([action('damage', 'damage', 'water', 18), action('healTarget', 'heal', 'fire', 18)], {
+        effect: 'Attaque [1 à 35] Eau\nSoigne [1 à 35] Feu',
+      }),
+      ability([action('damage', 'damage', 'water', 10), action('healTarget', 'heal', 'light', 40)], {
+        effect: 'Attaque 10 Eau\nSoigne 40 Lumière à toutes les cartes alliées',
+      }),
+    ]);
+    assert.deepEqual(medusine?.heal, []);
+    assert.deepEqual(medusine?.opponentHeal.map((line) => [line.value, line.elements]), [[18, { fire: 1 }]]);
+    assert.equal(allyHealer?.heal.length, 1);
+    assert.deepEqual(allyHealer?.opponentHeal, []);
+  });
+
+  it('relève l’Écho donné par un talent à toutes les capacités de la carte (Roulette)', () => {
+    const result = stats({
+      talents: [talent(1, { name: 'Roulette', effect: 'Toutes les compétences de cette carte gagnent Écho (10 %).',
+        actions: [action('AddSRoulette', 'other', null, 100)] })],
+    });
+    assert.equal(result.talents['1']?.echoBonus, 0.1);
+    assert.equal(result.base.echoBonus, undefined);
+  });
+
+  it('relève l’AoE : passif de la carte, talent qui le donne (selon sa rareté), mot-clé d’une capacité', () => {
+    const result = stats({
+      skills: [{ id: 'Aoe_C', name: 'AoE', effect: 'Attaque et soigne les cibles adjacentes à hauteur de 20% des dégâts infligés',
+        effectRich: '', rarity: 'common', element: null, value: 20, icon: null }],
+      abilities: [
+        ability([action('damage', 'damage', 'earth', 40)], { effectRich: 'Attaque 40 Terre\n{kw:tox.Aoe}AoE{/kw}' }),
+        ability([action('damage', 'damage', 'earth', 40)], { effectRich: 'Attaque 40 Terre' }),
+      ],
+      talents: [talent(1, { grantsSkill: 'Aoe_R', actions: [action('AddSAoe_R', 'other', null, 100)] })],
+    });
+    assert.equal(result.base.adjacentShare, 0.2);
+    assert.equal(result.talents['1']?.adjacentShare, 0.4);
+    assert.deepEqual(result.base.abilities.map((model) => model.adjacentShare), [0.2, undefined]);
+  });
+
+  it('compte un soin de toutes les cartes alliées sur 4 cartes, pas un renfort sur toutes les alliées', () => {
+    const [all, one] = model([
+      ability([action('healTarget', 'heal', 'light', 40)], { effect: 'Soigne 40 Lumière à toutes les cartes alliées' }),
+      ability([action('healTarget', 'heal', 'shadow', 20), action('AddAllPlayerMiss', 'other', null, 2)], {
+        effect: 'Soigne [15 à 25] Ombre\nPrécision (+2%) sur toutes les cartes alliées',
+      }),
+    ]);
+    assert.equal(all?.heal[0]?.targets, 4);
+    assert.equal(one?.heal[0]?.targets, 1);
   });
 
   it('repère un bonus réservé aux coups critiques', () => {
