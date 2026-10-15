@@ -210,6 +210,12 @@ describe('analyzeDeck : simulation', () => {
     assert.deepEqual(backward.generatedPerTurn, forward.generatedPerTurn);
   });
 
+  it('donne toujours un bonus en entier : ni la précision ni le critique ne le changent', () => {
+    // 3 Ombre, précision 80 %, critique 50 % × 2 : 3 (pas 3 × 0,8, ni × 1,5).
+    const cards = [cardStats('a', { abilities: [ability({ bonus: [line(3, 'shadow')], precision: 80, critChance: 50 })] })];
+    assert.deepEqual(analyzeDeck(cards, { turns: 1 }).turns[0]?.bonusStock, { shadow: 3 });
+  });
+
   it('ne génère un bonus « en cas de coup critique » qu’avec la chance de critique', () => {
     const critBonus = { ...line(2, 'water'), onCritOnly: true };
     const cards = [cardStats('a', { abilities: [ability({ bonus: [critBonus], critChance: 25 })] })];

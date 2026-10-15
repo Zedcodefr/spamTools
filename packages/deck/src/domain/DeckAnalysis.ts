@@ -327,10 +327,9 @@ function simulate(
         const growth = ability.growth.bonus * (uses[index]?.[abilityIndex] ?? 0);
         const cardBoosts = boosts[index] as CardBoosts;
         for (const line of ability.bonus) {
-          // Bonus « en cas de coup critique » : précision × chance de critique ; sinon espérance de critique.
-          const chance = line.onCritOnly
-            ? hitChance(ability, cardBoosts) * critChance(ability, cardBoosts)
-            : successFactor(ability, cardBoosts);
+          // Un bonus est toujours obtenu : ni la précision ni un coup critique ne le changent.
+          // Seul un bonus « en cas de coup critique » dépend de la chance de critique.
+          const chance = line.onCritOnly ? critChance(ability, cardBoosts) : 1;
           addInto(byCard, scale(line.elements, (line.value + growth) * line.weight * rate * chance));
         }
         addInto(consumed, scale(ability.cost, rate));
