@@ -36,7 +36,7 @@ export function LoginPage({ onSignedIn, onCancel, overlay = false }: LoginPagePr
     <div className={overlay ? 'auth auth--overlay' : 'auth'}>
       <form className="auth__card" onSubmit={submit}>
         <h1 className="auth__logo">
-          <img className="auth__logo-image" src="/logo.png" alt="spamTools" width="320" height="133" />
+          <img className="auth__logo-image" src="/logo.png" alt="spamTools" width="320" height="139" />
         </h1>
         <p className="auth__hint">Connectez-vous pour enregistrer vos decks, votre collection et chercher les meilleurs decks.</p>
         <label>

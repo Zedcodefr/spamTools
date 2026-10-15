@@ -95,7 +95,7 @@ export function App() {
               navigate('/');
             }}
           >
-            <img className="app__logo-image" src="/logo.png" alt="spamTools" width="320" height="133" />
+            <img className="app__logo-image" src="/logo.png" alt="spamTools" width="320" height="139" />
           </a>
         </h1>
         <nav className="app__nav" aria-label="Outils">
