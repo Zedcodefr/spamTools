@@ -393,6 +393,27 @@
   align-items: start;
 }
 
-.deck-panel.deck-panel--expanded .deck-analysis__block .chart {
-  max-width: 40rem;
+.deck-panel.deck-panel--expanded .deck-analysis__block--wide {
+  grid-column: 1 / -1;
+}
+
+/* Graphiques agrandis (largeur mesurée, hauteurs × 1,6) : texte un peu plus grand pour rester lisible. */
+.deck-panel.deck-panel--expanded .chart__label {
+  font-size: 13px;
+}
+
+.deck-panel.deck-panel--expanded .chart__value {
+  font-size: 12px;
+}
+
+.deck-panel.deck-panel--expanded .chart__tick {
+  font-size: 11px;
+}
+
+.deck-panel.deck-panel--expanded .chart-legend {
+  font-size: 0.85rem;
+}
+
+.deck-panel.deck-panel--expanded .chart-multiples {
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
 }

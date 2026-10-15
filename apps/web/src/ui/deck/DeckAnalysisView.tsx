@@ -1,6 +1,6 @@
 import type { DeckAnalysis, ElementAmounts } from '../../domain/Deck.ts';
 import { useCardEnvironment } from '../card/CardEnvironment.tsx';
-import { BarChart, ComboChart, LineChart, type ChartCategory } from '../charts/Charts.tsx';
+import { BarChart, ChartSizeProvider, ComboChart, LineChart, type ChartCategory, type ChartSize } from '../charts/Charts.tsx';
 import type { AnalysisState } from './DeckBuilderPage.tsx';
 
 const MAX_TURNS = 50;
@@ -18,14 +18,19 @@ interface DeckAnalysisViewProps {
   readonly state: AnalysisState;
   readonly turns: number;
   readonly onTurnsChange: (turns: number) => void;
+  /** Deck affiché sur tout l'écran : graphiques plus grands. */
+  readonly expanded?: boolean;
 }
+
+const NORMAL_SIZE: ChartSize = { fill: false, scale: 1 };
+const EXPANDED_SIZE: ChartSize = { fill: true, scale: 1.6 };
 
 /**
  * Analyse du deck en graphiques : dégâts tour par tour (départ à 0, avant les talents),
  * dégâts et résistances par élément, éléments générés et consommés, stock de bonus par
  * élément (petits multiples), dégâts par carte. Les données restent consultables en tableaux.
  */
-export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisViewProps) {
+export function DeckAnalysisView({ state, turns, onTurnsChange, expanded = false }: DeckAnalysisViewProps) {
   const { catalog, assetUrl } = useCardEnvironment();
 
   if (state.status === 'empty') {
@@ -78,7 +83,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
         {analysis.turns.length} tours, dont <strong>{number.format(analysis.totalSingleTargetDamagePerTurn)}</strong> sur
         une même carte adverse
         {hasHeal && (
-          <div className="deck-analysis__block">
+          <div className="deck-analysis__block deck-analysis__block--wide">
             {' '}· <strong>{number.format(analysis.totalHealPerTurn)}</strong> soins par tour
           </div>
         )}
@@ -95,181 +100,183 @@ export function DeckAnalysisView({ state, turns, onTurnsChange }: DeckAnalysisVi
       )}
 
       {/* Un bloc par graphique : empilés à côté des cartes, en grille quand le deck est agrandi. */}
-      <div className="deck-analysis__blocks">
-        <div className="deck-analysis__block">
-          <h4>
-            Dégâts par tour
-            <label className="deck-analysis__turns">
-              sur
-              <input
-                type="number"
-                min={1}
-                max={MAX_TURNS}
-                value={turns}
-                onChange={(event) => onTurnsChange(Math.min(MAX_TURNS, Math.max(1, Number(event.target.value) || 1)))}
-              />
-              tours
-            </label>
-          </h4>
-          <ComboChart
-            xs={xs}
-            xLabel={turnLabel}
-            format={formatAxis}
-            series={[
-              { ...TOTAL, values: along((turn) => turn.totalDamage) },
-              { ...SINGLE, values: along((turn) => turn.totalSingleTargetDamage) },
-            ]}
-            upperBounds={
-              analysis.whenAlwaysHit === null
-                ? []
-                : [
-                    {
-                      of: TOTAL.key,
-                      label: 'Totaux si toujours frappé',
-                      values: [0, ...analysis.whenAlwaysHit.turns.map((turn) => turn.totalDamage)],
-                    },
-                  ]
-            }
-          />
-        </div>
-        {hasHeal && (
-          <div className="deck-analysis__block">
-            <h4>Soins par tour</h4>
+      <ChartSizeProvider size={expanded ? EXPANDED_SIZE : NORMAL_SIZE}>
+        <div className="deck-analysis__blocks">
+          <div className="deck-analysis__block deck-analysis__block--wide">
+            <h4>
+              Dégâts par tour
+              <label className="deck-analysis__turns">
+                sur
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_TURNS}
+                  value={turns}
+                  onChange={(event) => onTurnsChange(Math.min(MAX_TURNS, Math.max(1, Number(event.target.value) || 1)))}
+                />
+                tours
+              </label>
+            </h4>
             <ComboChart
               xs={xs}
               xLabel={turnLabel}
               format={formatAxis}
-              height={150}
               series={[
-                { key: 'heal', label: 'Soins', color: 'var(--chart-series-1)', values: along((turn) => turn.totalHeal) },
+                { ...TOTAL, values: along((turn) => turn.totalDamage) },
+                { ...SINGLE, values: along((turn) => turn.totalSingleTargetDamage) },
               ]}
+              upperBounds={
+                analysis.whenAlwaysHit === null
+                  ? []
+                  : [
+                      {
+                        of: TOTAL.key,
+                        label: 'Totaux si toujours frappé',
+                        values: [0, ...analysis.whenAlwaysHit.turns.map((turn) => turn.totalDamage)],
+                      },
+                    ]
+              }
             />
           </div>
-        )}
-
-        <div className="deck-analysis__block">
-          <h4>Dégâts moyens par élément</h4>
-          <BarChart
-            categories={elements.filter((element) => amount(analysis.damagePerTurn, element.key) > 0)}
-            series={[TOTAL, SINGLE]}
-            value={(id, series) =>
-              amount(series === 'total' ? analysis.damagePerTurn : analysis.singleTargetDamagePerTurn, id)
-            }
-            format={formatValue}
-          />
-        </div>
-
-        <div className="deck-analysis__block">
-          <h4>Résistances moyennes</h4>
-          <BarChart
-            categories={elements.filter((element) => analysis.averageResistances[element.key] !== undefined)}
-            series={[{ key: 'resistance', label: 'Résistance moyenne', color: 'var(--chart-series-1)' }]}
-            value={(id) => amount(analysis.averageResistances, id)}
-            format={formatPercent}
-            emphasis={(id) => weak.has(id)}
-            emphasisLabel="faiblesse"
-          />
-        </div>
-
-        <div className="deck-analysis__block">
-          <h4>Éléments par tour</h4>
-          <BarChart
-            categories={elements.filter(
-              (element) =>
-                amount(analysis.generatedPerTurn, element.key) > 0 || amount(analysis.consumedPerTurn, element.key) > 0,
-            )}
-            series={
-              hasConsumption
-                ? [
-                    { key: 'generated', label: 'Générés', color: 'var(--chart-series-1)' },
-                    { key: 'consumed', label: 'Consommés', color: 'var(--chart-series-2)' },
-                  ]
-                : [{ key: 'generated', label: 'Générés', color: 'var(--chart-series-1)' }]
-            }
-            value={(id, series) =>
-              amount(series === 'generated' ? analysis.generatedPerTurn : analysis.consumedPerTurn, id)
-            }
-            format={formatValue}
-          />
-        </div>
-
-        {stockElements.length > 0 && (
-          <div className="deck-analysis__block">
-            <h4>Stock de bonus par élément</h4>
-            <p className="deck-analysis__muted">
-              +10 % de dégâts et de soins de l'élément par point. Même échelle pour tous les éléments.
-            </p>
-            <div className="chart-multiples">
-              {stockElements.map((element) => (
-                <LineChart
-                  key={element.key}
-                  compact
-                  height={70}
-                  maxY={stockMax}
-                  xs={xs}
-                  xLabel={turnLabel}
-                  format={formatValue}
-                  series={[
-                    {
-                      key: element.key,
-                      label: element.label,
-                      color: 'var(--chart-series-1)',
-                      values: along((turn) => turn.bonusStock[element.key] ?? 0),
-                    },
-                  ]}
-                  title={
-                    <p className="chart-multiples__title">
-                      {element.icon && <img src={element.icon} alt="" />}
-                      {element.label}
-                      <span>{number.format(last?.bonusStock[element.key] ?? 0)}</span>
-                    </p>
-                  }
-                />
-              ))}
+          {hasHeal && (
+            <div className="deck-analysis__block">
+              <h4>Soins par tour</h4>
+              <ComboChart
+                xs={xs}
+                xLabel={turnLabel}
+                format={formatAxis}
+                height={150}
+                series={[
+                  { key: 'heal', label: 'Soins', color: 'var(--chart-series-1)', values: along((turn) => turn.totalHeal) },
+                ]}
+              />
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="deck-analysis__block">
-          <h4>Par carte</h4>
-          <BarChart
-            categories={analysis.cards.map((card) => ({
-              key: card.cardId,
-              label: card.isDps ? `${card.cardName} (DPS)` : card.cardName,
-            }))}
-            labelWidth={150}
-            series={[TOTAL, SINGLE]}
-            value={(id, series) => {
-              const card = analysis.cards.find((candidate) => candidate.cardId === id);
-              return (series === 'total' ? card?.damagePerTurn : card?.singleTargetDamagePerTurn) ?? 0;
-            }}
-            format={formatValue}
-          />
-          <ul className="deck-analysis__cards">
-            {analysis.cards.map((card) => (
-              <li key={card.cardId}>
-                <span>
-                  {card.cardName} <span className="deck-analysis__muted">· {card.talentName ?? 'aucun talent'}</span>
-                </span>
-                <BoostsLine boosts={card.finalBoosts} turn={last?.turn ?? 0} />
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {analysis.unquantified.length > 0 && (
           <div className="deck-analysis__block">
-            <h4>Non chiffré</h4>
-            <ul className="deck-analysis__notes">
-              {analysis.unquantified.map((note, index) => (
-                <li key={index}>
-                  <strong>{note.cardName}</strong> · {note.source} : {note.reason}
+            <h4>Dégâts moyens par élément</h4>
+            <BarChart
+              categories={elements.filter((element) => amount(analysis.damagePerTurn, element.key) > 0)}
+              series={[TOTAL, SINGLE]}
+              value={(id, series) =>
+                amount(series === 'total' ? analysis.damagePerTurn : analysis.singleTargetDamagePerTurn, id)
+              }
+              format={formatValue}
+            />
+          </div>
+
+          <div className="deck-analysis__block">
+            <h4>Résistances moyennes</h4>
+            <BarChart
+              categories={elements.filter((element) => analysis.averageResistances[element.key] !== undefined)}
+              series={[{ key: 'resistance', label: 'Résistance moyenne', color: 'var(--chart-series-1)' }]}
+              value={(id) => amount(analysis.averageResistances, id)}
+              format={formatPercent}
+              emphasis={(id) => weak.has(id)}
+              emphasisLabel="faiblesse"
+            />
+          </div>
+
+          <div className="deck-analysis__block">
+            <h4>Éléments par tour</h4>
+            <BarChart
+              categories={elements.filter(
+                (element) =>
+                  amount(analysis.generatedPerTurn, element.key) > 0 || amount(analysis.consumedPerTurn, element.key) > 0,
+              )}
+              series={
+                hasConsumption
+                  ? [
+                      { key: 'generated', label: 'Générés', color: 'var(--chart-series-1)' },
+                      { key: 'consumed', label: 'Consommés', color: 'var(--chart-series-2)' },
+                    ]
+                  : [{ key: 'generated', label: 'Générés', color: 'var(--chart-series-1)' }]
+              }
+              value={(id, series) =>
+                amount(series === 'generated' ? analysis.generatedPerTurn : analysis.consumedPerTurn, id)
+              }
+              format={formatValue}
+            />
+          </div>
+
+          {stockElements.length > 0 && (
+            <div className="deck-analysis__block">
+              <h4>Stock de bonus par élément</h4>
+              <p className="deck-analysis__muted">
+                +10 % de dégâts et de soins de l'élément par point. Même échelle pour tous les éléments.
+              </p>
+              <div className="chart-multiples">
+                {stockElements.map((element) => (
+                  <LineChart
+                    key={element.key}
+                    compact
+                    height={70}
+                    maxY={stockMax}
+                    xs={xs}
+                    xLabel={turnLabel}
+                    format={formatValue}
+                    series={[
+                      {
+                        key: element.key,
+                        label: element.label,
+                        color: 'var(--chart-series-1)',
+                        values: along((turn) => turn.bonusStock[element.key] ?? 0),
+                      },
+                    ]}
+                    title={
+                      <p className="chart-multiples__title">
+                        {element.icon && <img src={element.icon} alt="" />}
+                        {element.label}
+                        <span>{number.format(last?.bonusStock[element.key] ?? 0)}</span>
+                      </p>
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="deck-analysis__block">
+            <h4>Par carte</h4>
+            <BarChart
+              categories={analysis.cards.map((card) => ({
+                key: card.cardId,
+                label: card.isDps ? `${card.cardName} (DPS)` : card.cardName,
+              }))}
+              labelWidth={150}
+              series={[TOTAL, SINGLE]}
+              value={(id, series) => {
+                const card = analysis.cards.find((candidate) => candidate.cardId === id);
+                return (series === 'total' ? card?.damagePerTurn : card?.singleTargetDamagePerTurn) ?? 0;
+              }}
+              format={formatValue}
+            />
+            <ul className="deck-analysis__cards">
+              {analysis.cards.map((card) => (
+                <li key={card.cardId}>
+                  <span>
+                    {card.cardName} <span className="deck-analysis__muted">· {card.talentName ?? 'aucun talent'}</span>
+                  </span>
+                  <BoostsLine boosts={card.finalBoosts} turn={last?.turn ?? 0} />
                 </li>
               ))}
             </ul>
           </div>
-        )}
-      </div>
+
+          {analysis.unquantified.length > 0 && (
+            <div className="deck-analysis__block">
+              <h4>Non chiffré</h4>
+              <ul className="deck-analysis__notes">
+                {analysis.unquantified.map((note, index) => (
+                  <li key={index}>
+                    <strong>{note.cardName}</strong> · {note.source} : {note.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </ChartSizeProvider>
 
       <details className="deck-analysis__data">
         <summary>Voir les données</summary>

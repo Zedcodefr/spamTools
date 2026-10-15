@@ -262,7 +262,7 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
           })}
         </ol>
 
-        <DeckAnalysisView state={analysis} turns={turns} onTurnsChange={setTurns} />
+        <DeckAnalysisView state={analysis} turns={turns} onTurnsChange={setTurns} expanded={expanded} />
       </aside>
     </div>
   );

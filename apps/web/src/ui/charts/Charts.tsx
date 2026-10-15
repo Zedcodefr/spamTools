@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, use, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import './Charts.css';
 
 /**
@@ -28,6 +28,43 @@ const WIDTH = 460;
 const LABEL_WIDTH = 92;
 const VALUE_GUTTER = 44;
 
+/**
+ * Taille des graphiques. Par défaut : largeur fixe (460), mise à l'échelle par le navigateur.
+ * `fill` : largeur mesurée sur la place disponible (le texte garde sa taille) et hauteurs × `scale`
+ * (affichage agrandi).
+ */
+export interface ChartSize {
+  readonly fill: boolean;
+  readonly scale: number;
+}
+
+const ChartSizeContext = createContext<ChartSize>({ fill: false, scale: 1 });
+
+export function ChartSizeProvider({ size, children }: { size: ChartSize; children: ReactNode }) {
+  return <ChartSizeContext value={size}>{children}</ChartSizeContext>;
+}
+
+/** Largeur du graphique (mesurée en mode `fill`) et coefficient de hauteur. */
+function useChartSize(): { frame: RefObject<HTMLDivElement | null>; width: number; measured: boolean; scale: number } {
+  const { fill, scale } = use(ChartSizeContext);
+  const frame = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = frame.current;
+    if (!fill || element === null) {
+      setMeasured(null);
+      return;
+    }
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry?.contentRect.width ?? 0);
+      setMeasured(width > 0 ? Math.max(120, width) : null);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fill]);
+  return { frame, width: measured ?? WIDTH, measured: measured !== null, scale: fill ? scale : 1 };
+}
+
 /** Légende : clé rectangulaire pour les barres, trait pour les courbes. */
 export function Legend({ series, kind }: { series: readonly ChartSeries[]; kind: 'bar' | 'line' }) {
   if (series.length < 2) {
@@ -52,7 +89,7 @@ interface Tooltip {
   readonly rows: readonly { readonly label: string; readonly value: string; readonly color: string }[];
 }
 
-function TooltipView({ tooltip }: { tooltip: Tooltip | null }) {
+function TooltipView({ tooltip, width = WIDTH }: { tooltip: Tooltip | null; width?: number }) {
   if (tooltip === null) {
     return null;
   }
@@ -60,7 +97,7 @@ function TooltipView({ tooltip }: { tooltip: Tooltip | null }) {
     <div
       className="chart-tooltip"
       role="status"
-      style={{ left: `${(tooltip.x / WIDTH) * 100}%`, top: tooltip.y }}
+      style={{ left: `${(tooltip.x / width) * 100}%`, top: tooltip.y }}
     >
       <p className="chart-tooltip__title">{tooltip.title}</p>
       {tooltip.rows.map((row) => (
@@ -114,7 +151,9 @@ export function BarChart({
   labelWidth = LABEL_WIDTH,
 }: BarChartProps) {
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
-  const barHeight = series.length > 1 ? 10 : 12;
+  const { frame, width, scale } = useChartSize();
+  // Barres fines (≤ 12 px) ; un peu plus épaisses quand le graphique est agrandi.
+  const barHeight = Math.round((series.length > 1 ? 10 : 12) * Math.min(scale, 1.5));
   const gap = 2;
   const band = series.length * (barHeight + gap) + 12;
   const height = categories.length * band + 8;
@@ -123,7 +162,11 @@ export function BarChart({
   const max = Math.max(0, ...values);
   const span = max - min || 1;
   const plotLeft = labelWidth;
-  const plotWidth = WIDTH - labelWidth - VALUE_GUTTER;
+  // Place à droite des barres pour les étiquettes de valeur (« 7,5 % · faiblesse » compris) ;
+  // ~6 px par caractère, un peu plus quand le texte est agrandi.
+  const longestLabel = Math.max(0, ...values.map((number) => format(number).length)) + (emphasisLabel ? emphasisLabel.length + 3 : 0);
+  const valueGutter = Math.max(VALUE_GUTTER, Math.ceil(longestLabel * 6 * (scale > 1 ? 1.2 : 1)) + 8);
+  const plotWidth = width - labelWidth - valueGutter;
   const xOf = (number: number) => plotLeft + ((number - min) / span) * plotWidth;
   // Étiquettes sélectives : la première barre la plus haute et la première la plus basse.
   const labelled = new Set([values.indexOf(Math.max(...values)), values.indexOf(Math.min(...values))]);
@@ -131,8 +174,8 @@ export function BarChart({
   return (
     <div className="chart">
       <Legend series={series} kind="bar" />
-      <div className="chart__frame">
-        <svg viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-hidden="true" className="chart__svg">
+      <div className="chart__frame" ref={frame}>
+        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-hidden="true" className="chart__svg">
           <line className="chart__baseline" x1={xOf(0)} x2={xOf(0)} y1={0} y2={height} />
           {categories.map((category, row) => {
             const top = row * band + 6;
@@ -181,7 +224,7 @@ export function BarChart({
             );
           })}
         </svg>
-        <TooltipView tooltip={tooltip} />
+        <TooltipView tooltip={tooltip} width={width} />
       </div>
     </div>
   );
@@ -189,7 +232,7 @@ export function BarChart({
   function tooltipFor(category: ChartCategory, row: number, index: number) {
     return () =>
       setTooltip({
-        x: WIDTH / 2,
+        x: width / 2,
         y: row * band + 6 + index * (barHeight + gap) + barHeight + 6,
         title: category.label,
         rows: series.map((entry) => ({
@@ -218,9 +261,11 @@ interface LineChartProps {
  * Courbes (lignes de 2 px), réticule vertical qui se cale sur l'abscisse la plus proche et
  * infobulle listant toutes les séries ; valeur affichée en fin de courbe.
  */
-export function LineChart({ xs, xLabel, series, format, height = 180, maxY, compact = false, title }: LineChartProps) {
+export function LineChart({ xs, xLabel, series, format, height: baseHeight = 180, maxY, compact = false, title }: LineChartProps) {
   const [hover, setHover] = useState<number | null>(null);
-  const width = compact ? 150 : WIDTH;
+  const size = useChartSize();
+  const width = compact && !size.measured ? 150 : size.width;
+  const height = Math.round(baseHeight * size.scale);
   const padding = compact
     ? { left: 6, right: 6, top: 8, bottom: 16 }
     : { left: 36, right: VALUE_GUTTER + 4, top: 10, bottom: 22 };
@@ -247,7 +292,7 @@ export function LineChart({ xs, xLabel, series, format, height = 180, maxY, comp
     <div className={compact ? 'chart chart--compact' : 'chart'}>
       {title}
       {!compact && <Legend series={series} kind="line" />}
-      <div className="chart__frame">
+      <div className="chart__frame" ref={size.frame}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="chart__svg"
@@ -312,7 +357,7 @@ export function LineChart({ xs, xLabel, series, format, height = 180, maxY, comp
         {hover !== null && (
           <TooltipView
             tooltip={{
-              x: Math.min(xOf(xs[hover] ?? 0) * (WIDTH / width), WIDTH - 80),
+              x: Math.min(xOf(xs[hover] ?? 0), width - 80),
               y: 4,
               title: xLabel(xs[hover] ?? 0),
               rows: series.map((entry) => ({
@@ -321,6 +366,7 @@ export function LineChart({ xs, xLabel, series, format, height = 180, maxY, comp
                 color: entry.color,
               })),
             }}
+            width={width}
           />
         )}
       </div>
@@ -348,13 +394,15 @@ interface ComboChartProps {
  * (ce tour précis), la courbe son cumul depuis le départ (0). Une couleur par mesure, partagée
  * par sa barre et sa courbe ; survol d'une abscisse entière.
  */
-export function ComboChart({ xs, xLabel, series, upperBounds = [], format, height = 200 }: ComboChartProps) {
+export function ComboChart({ xs, xLabel, series, upperBounds = [], format, height: baseHeight = 200 }: ComboChartProps) {
   const [hover, setHover] = useState<number | null>(null);
+  const { frame, width, scale } = useChartSize();
+  const height = Math.round(baseHeight * scale);
   const padding = { left: 36, right: VALUE_GUTTER + 4, top: 12, bottom: 22 };
-  const plotWidth = WIDTH - padding.left - padding.right;
+  const plotWidth = width - padding.left - padding.right;
   const step = plotWidth / Math.max(1, xs.length - 1);
   const gap = 2;
-  const barWidth = Math.max(2, Math.min(10, (step * 0.7 - gap * (series.length - 1)) / series.length));
+  const barWidth = Math.max(2, Math.min(10 * scale, (step * 0.7 - gap * (series.length - 1)) / series.length));
   const accumulate = (values: readonly number[]) => {
     let total = 0;
     return values.map((value) => (total += value));
@@ -390,16 +438,16 @@ export function ComboChart({ xs, xLabel, series, upperBounds = [], format, heigh
         ))}
         <li className="chart-legend__note">barre : ce tour · courbe : cumul</li>
       </ul>
-      <div className="chart__frame">
+      <div className="chart__frame" ref={frame}>
         <svg
-          viewBox={`0 0 ${WIDTH} ${height}`}
+          viewBox={`0 0 ${width} ${height}`}
           className="chart__svg"
           role="img"
           aria-hidden="true"
           tabIndex={0}
           onPointerMove={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
-            const x = ((event.clientX - rect.left) / rect.width) * WIDTH;
+            const x = ((event.clientX - rect.left) / rect.width) * width;
             setHover(Math.min(xs.length - 1, Math.max(0, Math.round((x - padding.left) / step))));
           }}
           onPointerLeave={() => setHover(null)}
@@ -414,13 +462,13 @@ export function ComboChart({ xs, xLabel, series, upperBounds = [], format, heigh
         >
           {[0, yMax / 2, yMax].map((tick) => (
             <g key={tick}>
-              <line className="chart__grid" x1={padding.left} x2={WIDTH - padding.right} y1={yOf(tick)} y2={yOf(tick)} />
+              <line className="chart__grid" x1={padding.left} x2={width - padding.right} y1={yOf(tick)} y2={yOf(tick)} />
               <text className="chart__tick" x={padding.left - 4} y={yOf(tick) + 3} textAnchor="end">
                 {format(tick)}
               </text>
             </g>
           ))}
-          <line className="chart__baseline" x1={padding.left} x2={WIDTH - padding.right} y1={baseline} y2={baseline} />
+          <line className="chart__baseline" x1={padding.left} x2={width - padding.right} y1={baseline} y2={baseline} />
           {hover !== null && (
             <line className="chart__crosshair" x1={xOf(hover)} x2={xOf(hover)} y1={padding.top} y2={baseline} />
           )}
@@ -503,7 +551,7 @@ export function ComboChart({ xs, xLabel, series, upperBounds = [], format, heigh
         {hover !== null && (
           <TooltipView
             tooltip={{
-              x: Math.min(Math.max(xOf(hover), 80), WIDTH - 80),
+              x: Math.min(Math.max(xOf(hover), 80), width - 80),
               y: 4,
               title: xLabel(xs[hover] ?? 0),
               rows: [
@@ -521,6 +569,7 @@ export function ComboChart({ xs, xLabel, series, upperBounds = [], format, heigh
                 ]),
               ],
             }}
+            width={width}
           />
         )}
       </div>
