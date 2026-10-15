@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Card } from '../../domain/Card.ts';
+import { useSession } from '../account/SessionContext.tsx';
 import { CardGallery } from '../spamdex/CardGallery.tsx';
 import type { CatalogData } from '../useCatalogData.ts';
 import { useCollection } from './useCollection.ts';
@@ -17,6 +18,7 @@ interface CollectionPageProps {
  */
 export function CollectionPage({ data, onVersionChange }: CollectionPageProps) {
   const { owned, error, setOwned } = useCollection();
+  const { account, goToLogin } = useSession();
   const [show, setShow] = useState<Show>('all');
 
   const shown = useMemo<CatalogData>(() => {
@@ -33,6 +35,40 @@ export function CollectionPage({ data, onVersionChange }: CollectionPageProps) {
 
   return (
     <div className="collection">
+      <header className="collection__intro">
+        <h2>Mes cartes</h2>
+        <p>
+          Indiquez les cartes que vous possédez dans le jeu. Le deck builder s’en sert ensuite : sa recherche du
+          meilleur deck peut se limiter à vos cartes (« Uniquement mes cartes »).
+        </p>
+        <ul>
+          <li>
+            <strong>Clic gauche</strong> sur une carte : possédée ou non (les cartes possédées sont mises en avant).
+          </li>
+          <li>
+            <strong>Clic droit</strong> : détail de la carte.
+          </li>
+          <li>
+            <strong>Tout sélectionner / désélectionner</strong> agit sur les cartes affichées : filtrez d’abord (par
+            exemple une rareté ou un élément), puis cochez-les toutes d’un coup.
+          </li>
+          <li>
+            <strong>Afficher</strong> : toutes les cartes, celles que vous possédez, ou celles qui vous manquent.
+          </li>
+        </ul>
+        {account === null ? (
+          <p className="collection__login">
+            Votre collection est enregistrée dans votre compte.{' '}
+            <button type="button" onClick={goToLogin}>
+              Se connecter
+            </button>
+          </p>
+        ) : (
+          <p className="collection__note">
+            Enregistré automatiquement dans votre compte, et conservé d’une version du jeu à l’autre.
+          </p>
+        )}
+      </header>
       {error !== null && (
         <p className="deck-panel__message deck-panel__message--error" role="alert">
           {error}

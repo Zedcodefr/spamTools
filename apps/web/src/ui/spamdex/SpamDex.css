@@ -293,3 +293,49 @@
   font-family: var(--font-display);
   font-size: 1.05rem;
 }
+
+.collection__intro {
+  max-width: 60rem;
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.collection__intro h2 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+
+.collection__intro p,
+.collection__intro ul {
+  margin: 0 0 0.5rem;
+}
+
+.collection__intro ul {
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+}
+
+.collection__intro strong {
+  color: var(--text);
+}
+
+.collection__note,
+.collection__login {
+  margin-bottom: 0 !important;
+  color: var(--text-muted);
+}
+
+.collection__login {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
