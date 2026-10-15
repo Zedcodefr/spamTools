@@ -21,8 +21,29 @@
 
 .deck-panel__head {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 0.5rem;
+}
+
+.deck-panel__expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+/* Deck et analyse sur tout l'écran : mêmes blocs, plus de place (4 cartes par ligne, graphiques larges). */
+.deck-panel.deck-panel--expanded {
+  position: fixed;
+  inset: 0.75rem;
+  z-index: 40;
+  max-height: none;
+  padding: 1.25rem max(1.25rem, calc((100% - 72rem) / 2));
+  box-shadow: 0 0 0 100vmax rgb(8 4 20 / 0.8);
+}
+
+.deck-panel.deck-panel--expanded .deck-panel__slots {
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
 .deck-panel__name {
@@ -362,4 +383,16 @@
   flex-direction: row;
   align-items: center;
   gap: 0.35rem;
+}
+
+/* Deck agrandi : les graphiques en grille, chacun à une largeur proche de l'affichage à côté des cartes. */
+.deck-panel.deck-panel--expanded .deck-analysis__blocks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr));
+  gap: 0.5rem 2rem;
+  align-items: start;
+}
+
+.deck-panel.deck-panel--expanded .deck-analysis__block .chart {
+  max-width: 40rem;
 }

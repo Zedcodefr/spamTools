@@ -115,12 +115,16 @@ et images dans `assets/`), ou dans le dossier indiqué par `SPAMTOOLS_DATA_DIR`.
 ## Deck builder (`/deck`)
 
 Clic gauche sur une carte de la galerie : l'ajouter au deck (4 cartes, sans doublon) ou l'en retirer ;
-au plus un talent par carte (aucun par défaut), et un **DPS** facultatif. L'analyse **simule la partie tour par tour, en espérance**,
+au plus un talent par carte (aucun par défaut), et un **DPS** facultatif. **Agrandir** affiche le deck et
+son analyse sur tout l'écran (graphiques en grille), **Réduire** ou Échap revient à côté des cartes. L'analyse **simule la partie tour par tour, en espérance**,
 les 4 cartes agissant à chaque tour :
 
 - capacité de recharge N : prête pour la première fois au tour N, puis N tours après chaque utilisation
-  (tour 1 : seules les recharges de 1 agissent) ; l'Écho la laisse prête au tour suivant avec sa chance,
-  suivie en probabilité ;
+  (tour 1 : seules les recharges de 1 agissent) ; l'Écho la rejoue aussitôt, dans le même tour, avec sa
+  chance (et ainsi de suite) : 1 / (1 − écho) utilisations en moyenne, talent Roulette compris ;
+- AoE (passif, talent, mot-clé d'une capacité) : les cartes adjacentes à la cible reçoivent la part indiquée
+  (20 / 40 / 80 %), 1,5 voisine en moyenne ; un soin de la carte ciblée par une attaque (Épine Médusine)
+  soigne la carte adverse touchée et se déduit des dégâts ;
 - dégâts, soins et bonus élémentaires : × précision × (1 + chance de critique × (multiplicateur − 1)) ;
   « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
 - dégâts **totaux** (toutes cibles) et **cible unique** (reçus par une carte adverse donnée) : zone = 4 cibles,

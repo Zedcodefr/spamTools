@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Card } from '../../domain/Card.ts';
 import {
   DECK_SIZE,
@@ -42,6 +43,9 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [turns, setTurns] = useState(DEFAULT_TURNS);
   const analysis = useDeckAnalysis(data.catalog.version, draft, turns);
+  const [expanded, setExpanded] = useState(false);
+  const expandButton = useRef<HTMLButtonElement>(null);
+  useExpandedPanel(expanded, useCallback(() => setExpanded(false), []));
 
   const cardsById = useMemo(() => new Map(data.cards.map((card) => [card.id, card])), [data.cards]);
   const inDeck = useMemo(() => new Set(draft.slots.map((slot) => slot.cardId)), [draft.slots]);
@@ -115,7 +119,11 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
         />
       </div>
 
-      <aside className="deck-panel" aria-label="Deck">
+      <aside
+        className={expanded ? 'deck-panel deck-panel--expanded' : 'deck-panel'}
+        aria-label="Deck"
+        {...(expanded && { role: 'dialog', 'aria-modal': true })}
+      >
         <div className="deck-panel__head">
           <input
             className="deck-panel__name"
@@ -149,6 +157,20 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
               </option>
             ))}
           </select>
+          <button
+            ref={expandButton}
+            type="button"
+            className="deck-panel__expand"
+            aria-pressed={expanded}
+            title={expanded ? 'Revenir à l’affichage à côté des cartes (Échap)' : 'Afficher le deck et son analyse sur tout l’écran'}
+            onClick={() => {
+              setExpanded(!expanded);
+              expandButton.current?.focus();
+            }}
+          >
+            {expanded ? <Minimize2 size={16} aria-hidden /> : <Maximize2 size={16} aria-hidden />}
+            {expanded ? 'Réduire' : 'Agrandir'}
+          </button>
         </div>
 
         <div className="deck-panel__actions">
@@ -244,6 +266,28 @@ export function DeckBuilderPage({ data, onVersionChange }: DeckBuilderPageProps)
       </aside>
     </div>
   );
+}
+
+/** Panneau sur tout l'écran : Échap le réduit, et la page derrière ne défile plus. */
+function useExpandedPanel(expanded: boolean, collapse: () => void) {
+  useEffect(() => {
+    if (!expanded) {
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      // Échap ferme d'abord une fenêtre ouverte par-dessus (détail d'une carte).
+      if (event.key === 'Escape' && !event.defaultPrevented && document.querySelector('dialog[open]') === null) {
+        collapse();
+      }
+    };
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = overflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [expanded, collapse]);
 }
 
 export type AnalysisState =
