@@ -177,7 +177,7 @@ export function DeckAnalysisView({ state, turns, onTurnsChange, expanded = false
             />
           </div>
 
-          <div className="deck-analysis__block">
+          <div className="deck-analysis__block deck-analysis__block--wide">
             <h4>Éléments par tour</h4>
             <BarChart
               categories={elements.filter(
