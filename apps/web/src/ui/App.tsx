@@ -170,6 +170,9 @@ export function App() {
           <a href="https://spamgame.com/conditions-donnees-cartes">conditions d'utilisation</a>. Les illustrations
           sont l'œuvre de leurs artistes, crédités sous chaque carte.
         </p>
+        <p>
+          Contact : <a href="mailto:contact@zedcode.fr">contact@zedcode.fr</a>
+        </p>
       </footer>
     </div>
   );
