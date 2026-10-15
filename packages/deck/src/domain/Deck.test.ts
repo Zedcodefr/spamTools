@@ -216,11 +216,14 @@ describe('analyzeDeck : simulation', () => {
     assert.deepEqual(analyzeDeck(cards, { turns: 1 }).turns[0]?.bonusStock, { shadow: 3 });
   });
 
-  it('ne génère un bonus « en cas de coup critique » qu’avec la chance de critique', () => {
+  it('ne génère un bonus « en cas de coup critique » que si l’attaque touche, puis réussit le critique', () => {
     const critBonus = { ...line(2, 'water'), onCritOnly: true };
     const cards = [cardStats('a', { abilities: [ability({ bonus: [critBonus], critChance: 25 })] })];
     // 2 × 25 % = 0,5 eau par tour.
     assert.deepEqual(analyzeDeck(cards, { turns: 2 }).turns.map((turn) => turn.bonusStock['water']), [0.5, 1]);
+    // Précision 80 % : le critique n'est tenté que sur un coup qui touche -> 2 × 0,8 × 25 % = 0,4.
+    const imprecise = [cardStats('a', { abilities: [ability({ bonus: [critBonus], critChance: 25, precision: 80 })] })];
+    assert.deepEqual(analyzeDeck(imprecise, { turns: 1 }).turns[0]?.bonusStock, { water: 0.4 });
   });
 
   it('ne compte un renfort que si la capacité qui le lance touche (précision)', () => {

@@ -126,8 +126,8 @@ les 4 cartes agissant à chaque tour :
   (20 / 40 / 80 %), 1,5 voisine en moyenne ; un soin de la carte ciblée par une attaque (Épine Médusine)
   soigne la carte adverse touchée et se déduit des dégâts ;
 - dégâts et soins : × précision × (1 + chance de critique × (multiplicateur − 1)) ; bonus élémentaires :
-  toujours obtenus en entier, sans précision ni critique (un bonus « en cas de coup critique » : × chance
-  de critique) ;
+  toujours obtenus en entier, sans précision ni critique ; le critique n'est tenté que sur un coup qui
+  touche, donc un bonus « en cas de coup critique » : × précision × chance de critique ;
   « Choix » : moyenne des options ; élément aléatoire : réparti sur les 6 éléments ;
 - dégâts **totaux** (toutes cibles) et **cible unique** (reçus par une carte adverse donnée) : zone = 4 cibles,
   1 part par carte ; coup au hasard parmi les 4 adverses = 1 chance sur 4 de toucher une carte donnée
