@@ -199,9 +199,9 @@ afin que les robots qui n'exécutent pas JavaScript lisent la page :
 - `/robots.txt` (pages de compte et API exclues, images autorisées) et `/sitemap.xml` (accueil, deck builder,
   chaque carte), générés depuis le catalogue ; pages de compte en `noindex`.
 
-`SPAMTOOLS_PUBLIC_URL` donne l'adresse des URL canoniques et du sitemap. Pas d'image Open Graph : les
-illustrations des cartes doivent être créditées et le logo du jeu n'est pas utilisable (conditions
-d'utilisation des données).
+`SPAMTOOLS_PUBLIC_URL` donne l'adresse des URL canoniques et du sitemap. Image d'aperçu des liens partagés :
+le logo du site (`apps/web/public/og-image.jpg`, 1200 × 630), jamais une illustration de carte (à créditer)
+ni le logo du jeu (conditions d'utilisation des données). Logo d'origine : `design/logo-source.png`.
 
 ## Déploiement (Docker)
 

@@ -87,7 +87,17 @@ export function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <h1>spamTools</h1>
+        <h1 className="app__logo">
+          <a
+            href="/"
+            onClick={(event) => {
+              event.preventDefault();
+              navigate('/');
+            }}
+          >
+            <img className="app__logo-image" src="/logo.png" alt="spamTools" width="320" height="133" />
+          </a>
+        </h1>
         <nav className="app__nav" aria-label="Outils">
           {tools.map((entry) => (
             <a

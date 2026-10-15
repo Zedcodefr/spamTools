@@ -10,6 +10,10 @@ import type { Container } from '../container.js';
 
 export const SITE_NAME = 'spamTools';
 
+/** Image d'aperçu des liens partagés (logo du site, apps/web/public/og-image.jpg). */
+const OG_IMAGE = { path: '/og-image.jpg', width: 1200, height: 630, alt: 'Logo spamTools' } as const;
+const LOGO_PATH = '/logo.png';
+
 /** Pages réservées aux comptes ou techniques : jamais indexées. */
 const PRIVATE_PATHS = new Set(['/compte', '/admin', '/mot-de-passe', '/connexion', '/collection']);
 
@@ -164,6 +168,8 @@ function website(baseUrl: string): Record<string, unknown> {
     url: `${baseUrl}/`,
     inLanguage: 'fr',
     description: 'Outils non officiels pour les joueurs de Spam : SpamDex, deck builder, simulation de decks.',
+    image: `${baseUrl}${OG_IMAGE.path}`,
+    publisher: { '@type': 'Organization', name: SITE_NAME, logo: { '@type': 'ImageObject', url: `${baseUrl}${LOGO_PATH}` } },
   };
 }
 
@@ -196,7 +202,12 @@ export function headTags(page: SeoPage, baseUrl: string): string {
     `<meta property="og:title" content="${escapeHtml(page.title)}" />`,
     `<meta property="og:description" content="${escapeHtml(page.description)}" />`,
     `<meta property="og:url" content="${escapeHtml(url)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${baseUrl}${OG_IMAGE.path}" />`,
+    `<meta property="og:image:width" content="${OG_IMAGE.width}" />`,
+    `<meta property="og:image:height" content="${OG_IMAGE.height}" />`,
+    `<meta property="og:image:alt" content="${OG_IMAGE.alt}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+    `<meta name="twitter:image" content="${baseUrl}${OG_IMAGE.path}" />`,
     ...page.jsonLd.map((data) => `<script type="application/ld+json">${json(data)}</script>`),
   ]
     .filter((tag) => tag !== '')

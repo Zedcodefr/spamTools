@@ -25,6 +25,16 @@
   color: var(--accent);
 }
 
+.auth__logo {
+  line-height: 0;
+  text-align: center;
+}
+
+.auth__logo-image {
+  width: min(100%, 16rem);
+  height: auto;
+}
+
 .auth__card label,
 .account__form label {
   display: flex;

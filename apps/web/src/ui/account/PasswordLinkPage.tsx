@@ -51,7 +51,9 @@ export function PasswordLinkPage({ onDone }: { onDone: (account: Account) => voi
   return (
     <div className="auth">
       <form className="auth__card" onSubmit={submit}>
-        <h1>spamTools</h1>
+        <h1 className="auth__logo">
+          <img className="auth__logo-image" src="/logo.png" alt="spamTools" width="320" height="133" />
+        </h1>
         {link.status === 'checking' && <p className="auth__hint">Vérification du lien…</p>}
         {link.status === 'invalid' && (
           <>

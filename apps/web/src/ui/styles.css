@@ -83,6 +83,17 @@ button:disabled {
   letter-spacing: 0.02em;
 }
 
+.app__logo {
+  align-self: center;
+  line-height: 0;
+}
+
+.app__logo-image {
+  display: block;
+  width: auto;
+  height: 3rem;
+}
+
 .app__nav {
   display: flex;
   flex-wrap: wrap;

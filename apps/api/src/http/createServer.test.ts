@@ -118,6 +118,8 @@ describe('API catalogue', () => {
       assert.match(home, /<meta name="description" content="Toutes les cartes du jeu Spam \(2 cartes, version 1\.10\)/);
       assert.match(home, /<link rel="canonical" href="https:\/\/spamtools\.test\/" \/>/);
       assert.match(home, /<meta name="robots" content="index, follow/);
+      assert.match(home, /<meta property="og:image" content="https:\/\/spamtools\.test\/og-image\.jpg" \/>/);
+      assert.match(home, /<meta name="twitter:card" content="summary_large_image" \/>/);
       assert.match(home, /<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@type":"WebSite"/);
       assert.match(home, /<noscript><main class="noscript"><h1>SpamDex[^]*<a href="\/\?card=esprit_feu">Esprit Feu<\/a>/);
       assert.match(home, /<div id="root"><\/div>/);
