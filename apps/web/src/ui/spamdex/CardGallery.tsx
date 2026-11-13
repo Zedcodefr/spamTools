@@ -51,6 +51,7 @@ export function CardGallery({
     <div className="spamdex">
       <FilterSidebar
         catalog={data.catalog}
+        cards={data.cards}
         visibleCards={visibleCards}
         filters={filters}
         onChange={setFilters}

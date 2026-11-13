@@ -18,6 +18,8 @@ export interface CardFilters {
   readonly categories: ReadonlySet<string>;
   /** Clés de capacités particulières. */
   readonly specialAbilities: ReadonlySet<string>;
+  /** Identifiants de talents. */
+  readonly talents: ReadonlySet<string>;
   /** Seulement les cartes multiélément. */
   readonly multiElement: boolean;
   readonly hp: NumberRange;
@@ -53,6 +55,7 @@ export const NO_FILTERS: CardFilters = {
   healElements: new Set(),
   categories: new Set(),
   specialAbilities: new Set(),
+  talents: new Set(),
   multiElement: false,
   hp: { min: null, max: null },
   spamton: { min: null, max: null },
@@ -76,6 +79,7 @@ export const SELECTION_FILTERS = [
   'healElements',
   'categories',
   'specialAbilities',
+  'talents',
 ] as const satisfies readonly (keyof CardFilters)[];
 
 export type SelectionFilter = (typeof SELECTION_FILTERS)[number];
@@ -92,6 +96,7 @@ export function filterCards(cards: readonly Card[], filters: CardFilters): Card[
       matchesAll(filters.healElements, traits.healElements) &&
       matchesAll(filters.categories, traits.categories) &&
       matchesAll(filters.specialAbilities, traits.specialAbilities) &&
+      matchesAll(filters.talents, card.talents.map((talent) => talent.id)) &&
       (!filters.multiElement || traits.multiElement) &&
       inRange(card.hp, filters.hp) &&
       inRange(card.spamton, filters.spamton) &&

@@ -1,6 +1,6 @@
-import { Palette } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
-import type { Card } from '../../domain/Card.ts';
+import { Palette, Sparkles } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import type { Card, Talent } from '../../domain/Card.ts';
 import type { CatalogOverview, TraitCategory } from '../../domain/Catalog.ts';
 import {
   hasActiveFilters,
@@ -13,6 +13,8 @@ import { TraitIcon } from '../card/TraitIcon.tsx';
 
 interface FilterSidebarProps {
   readonly catalog: CatalogOverview;
+  /** Toutes les cartes de la version : base de la liste des talents. */
+  readonly cards: readonly Card[];
   /** Cartes affichées avec les filtres actuels : base des compteurs de chaque facette. */
   readonly visibleCards: readonly Card[];
   readonly filters: CardFilters;
@@ -24,7 +26,7 @@ interface FilterSidebarProps {
  * Filtres de la galerie, regroupés par thèmes repliables, une facette par ligne.
  * Élément de la carte et rareté : l'une des valeurs choisies. Autres facettes : toutes celles choisies.
  */
-export function FilterSidebar({ catalog, visibleCards, filters, onChange, assetUrl }: FilterSidebarProps) {
+export function FilterSidebar({ catalog, cards, visibleCards, filters, onChange, assetUrl }: FilterSidebarProps) {
   const toggle = (group: SelectionFilter, id: string) => {
     const next = new Set(filters[group]);
     if (!next.delete(id)) {
@@ -107,6 +109,13 @@ export function FilterSidebar({ catalog, visibleCards, filters, onChange, assetU
         onChange={(event) => onChange({ ...filters, text: event.target.value })}
       />
 
+      <TalentTheme
+        cards={cards}
+        selection={filters.talents}
+        count={(id) => count((card) => card.talents.some((talent) => talent.id === id))}
+        onToggle={(id) => toggle('talents', id)}
+      />
+
       <Theme title="Éléments" selected={elementSelections + (filters.multiElement ? 1 : 0)} initiallyOpen>
         {elementRow('elements', 'Carte', "Élément propre à la carte (l'un de ceux choisis)")}
         {elementRow('strikeElements', 'Frappe', 'Éléments dans lesquels ses capacités infligent des dégâts')}
@@ -150,6 +159,74 @@ export function FilterSidebar({ catalog, visibleCards, filters, onChange, assetU
       </Theme>
     </aside>
   );
+}
+
+/**
+ * Talents présents sur au moins une carte, dans l'ordre alphabétique, avec une recherche
+ * pour s'y retrouver parmi la centaine. Les talents choisis restent en tête de liste.
+ */
+function TalentTheme({
+  cards,
+  selection,
+  count,
+  onToggle,
+}: {
+  cards: readonly Card[];
+  selection: ReadonlySet<string>;
+  count: (id: string) => number;
+  onToggle: (id: string) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const talents = useMemo(() => {
+    const byId = new Map<string, Talent>();
+    for (const card of cards) {
+      for (const talent of card.talents) {
+        byId.set(talent.id, talent);
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  }, [cards]);
+
+  const needle = normalize(search.trim());
+  const shown = talents.filter(
+    (talent) =>
+      selection.has(talent.id) ||
+      needle === '' ||
+      normalize(talent.name).includes(needle) ||
+      normalize(talent.effect).includes(needle),
+  );
+  const ordered = [...shown.filter((talent) => selection.has(talent.id)), ...shown.filter((talent) => !selection.has(talent.id))];
+
+  return (
+    <Theme title="Talents" icon={<Sparkles size={18} aria-hidden="true" />} selected={selection.size}>
+      <input
+        type="search"
+        className="filters__search"
+        placeholder="Chercher un talent…"
+        aria-label="Chercher un talent"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      <div className="filters__list">
+        {ordered.map((talent) => (
+          <Facet
+            key={talent.id}
+            icon={<Sparkles size={16} aria-hidden="true" />}
+            label={talent.name}
+            hint={talent.effect}
+            pressed={selection.has(talent.id)}
+            count={count(talent.id)}
+            onToggle={() => onToggle(talent.id)}
+          />
+        ))}
+        {ordered.length === 0 && <p className="filters__none">Aucun talent trouvé.</p>}
+      </div>
+    </Theme>
+  );
+}
+
+function normalize(text: string): string {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 }
 
 /** Thème repliable ; le nombre de facettes actives reste visible une fois replié. */

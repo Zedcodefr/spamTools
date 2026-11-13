@@ -98,6 +98,20 @@ describe('filterCards : caractéristiques', () => {
     assert.deepEqual(run({ healElements: new Set(['light']), categories: new Set(['affliction']) }), []);
     assert.deepEqual(run({ multiElement: true }), ['y']);
   });
+
+  it('filtre sur les talents (tous ceux choisis)', () => {
+    const talent = (id: string) => ({
+      slot: 1, id, name: id, effect: '', effectRich: '', elements: [], grantsSkill: null, actions: [],
+    });
+    const withTalents = [
+      card({ id: 'p', talents: [talent('focus'), talent('critique')] }),
+      card({ id: 'q', talents: [talent('focus')] }),
+    ];
+    const run = (selected: string[]) => ids(filterCards(withTalents, { ...NO_FILTERS, talents: new Set(selected) }));
+    assert.deepEqual(run(['focus']), ['p', 'q']);
+    assert.deepEqual(run(['focus', 'critique']), ['p']);
+    assert.equal(hasActiveFilters({ ...NO_FILTERS, talents: new Set(['focus']) }), true);
+  });
 });
 
 describe('sortCards', () => {
