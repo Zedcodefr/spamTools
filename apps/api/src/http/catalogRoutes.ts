@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Container } from '../container.js';
+import { adminOf } from './authentication.js';
 
 const versionQuery = {
   type: 'object',
@@ -56,4 +57,14 @@ export async function catalogRoutes(app: FastifyInstance, { container }: { conta
   );
 
   app.get('/api/card-layout', () => container.getCardLayout.execute());
+
+  // Mise à jour depuis spamgame.com (dernière version publiée), réservée aux administrateurs.
+  app.get('/api/admin/catalog/sync', (request) => {
+    adminOf(request);
+    return container.catalogSyncJob.current();
+  });
+  app.post('/api/admin/catalog/sync', async (request, reply) => {
+    const admin = adminOf(request);
+    return reply.code(202).send(container.catalogSyncJob.start(admin.username));
+  });
 }

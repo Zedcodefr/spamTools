@@ -95,7 +95,15 @@ Utilisation soumise aux [conditions d'utilisation des données](https://spamgame
 projet non commercial, **artiste crédité** sur chaque illustration affichée, **mention « projet non officiel »**,
 pas de logo du jeu.
 
-Mise à jour manuelle, en ligne de commande :
+Mise à jour depuis le site : **Administration → Mise à jour des cartes** (administrateurs) importe la
+dernière version publiée. Elle tourne en arrière-plan sur le serveur (une à la fois) et la page en suit
+l'avancement ; l'état n'est gardé qu'en mémoire (`GET`/`POST /api/admin/catalog/sync`).
+
+**Mise à jour automatique** : le serveur la lance toutes les `SPAMTOOLS_SYNC_INTERVAL_HOURS` heures (par
+défaut 24 en production, désactivée en développement ; `0` la désactive), la première 5 minutes après le
+démarrage. Le résultat est journalisé et affiché dans l'administration, avec l'heure de la suivante.
+
+Ou en ligne de commande :
 
 ```sh
 pnpm sync                    # dernière version publiée
@@ -246,7 +254,8 @@ docker compose --env-file deploy/.env run --rm app create-admin moi   # affiche 
 
 Réglages de l'image (variables d'environnement) : `PORT` (3000), `HOST` (0.0.0.0), `SPAMTOOLS_DATA_DIR`
 (`/data`), `SPAMTOOLS_WEB_DIR` (front compilé, `/app/web`), `SPAMTOOLS_TRUST_PROXY` (derrière un reverse
-proxy), `SPAMTOOLS_SECURE_COOKIES` (par défaut en production), `SPAMTOOLS_PUBLIC_URL` (liens de
+proxy), `SPAMTOOLS_SECURE_COOKIES` (par défaut en production), `SPAMTOOLS_SYNC_INTERVAL_HOURS` (mise à jour
+automatique des cartes, 24 ; 0 la désactive), `SPAMTOOLS_PUBLIC_URL` (liens de
 `create-admin`). Le site reste soumis aux conditions d'utilisation
 des données de cartes (projet non commercial, artistes crédités, mention « non officiel »).
 

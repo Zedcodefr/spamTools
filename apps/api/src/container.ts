@@ -38,6 +38,7 @@ import {
   SqlitePasswordLinkRepository,
   SqliteSessionRepository,
 } from './adapters/identity/SqliteIdentityRepositories.js';
+import { CatalogSyncJob } from './CatalogSyncJob.js';
 import type { AppConfig } from './config.js';
 import { migrations } from './migrations.js';
 
@@ -62,6 +63,11 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
     new FileSystemAssetStore(config.assetsDirectory),
   );
 
+  const catalogSyncJob = new CatalogSyncJob(syncCatalog, config.language, {
+    info: (message) => console.log(message),
+    error: (message, error) => console.error(`${message} :`, error),
+  });
+
   const decks = new SqliteDeckRepository(database);
   const deckCards = new CatalogDeckCardStatsProvider(catalogs);
   const collection = new SqliteCollectionRepository(database);
@@ -80,6 +86,8 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
   return {
     config,
     syncCatalog,
+    /** Synchro faite par le serveur : par un administrateur depuis le site, ou automatique. */
+    catalogSyncJob,
     listCards: new ListCards(catalogs),
     getCard: new GetCard(catalogs),
     getCatalogOverview: new GetCatalogOverview(catalogs),
@@ -110,7 +118,11 @@ export async function createContainer(config: AppConfig, overrides: ContainerOve
       const link = await new BootstrapAdmin(identity).execute({ username });
       return { link, claimed: first ? claimOrphanData(database, link.account.id) : { decks: 0, cards: 0 } };
     },
-    close: () => database.close(),
+    close: async () => {
+      catalogSyncJob.unschedule();
+      await catalogSyncJob.whenIdle();
+      await database.close();
+    },
   };
 }
 

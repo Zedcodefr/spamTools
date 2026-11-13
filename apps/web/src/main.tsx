@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HttpAccountsGateway, HttpAuthGateway } from './infrastructure/HttpAuthGateway.ts';
 import { HttpCatalogGateway } from './infrastructure/HttpCatalogGateway.ts';
+import { HttpCatalogSyncGateway } from './infrastructure/HttpCatalogSyncGateway.ts';
 import { HttpCollectionGateway } from './infrastructure/HttpCollectionGateway.ts';
 import { HttpDeckGateway } from './infrastructure/HttpDeckGateway.ts';
 import { AuthGate } from './ui/account/AuthGate.tsx';
@@ -16,6 +17,7 @@ const gateways: Gateways = {
   collection: new HttpCollectionGateway(),
   auth: new HttpAuthGateway(),
   accounts: new HttpAccountsGateway(),
+  catalogSync: new HttpCatalogSyncGateway(),
 };
 
 const root = document.getElementById('root');

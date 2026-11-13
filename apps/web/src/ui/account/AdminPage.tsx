@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { passwordLinkUrl, ROLE_LABELS, type Account, type PasswordLink, type Role } from '../../domain/Account.ts';
 import { useGateways } from '../GatewaysContext.tsx';
+import { CatalogSyncPanel } from './CatalogSyncPanel.tsx';
 import './Account.css';
 
 /**
  * Administration des comptes : création (avec lien d'invitation), rôle, désactivation, lien de
- * réinitialisation du mot de passe, suppression. Son propre compte se gère dans « Mon compte ».
+ * réinitialisation du mot de passe, suppression ; et mise à jour des cartes. Son propre compte se gère dans « Mon compte ».
  */
 export function AdminPage({ currentAccountId }: { currentAccountId: string }) {
   const { accounts: gateway } = useGateways();
@@ -31,6 +32,8 @@ export function AdminPage({ currentAccountId }: { currentAccountId: string }) {
 
   return (
     <div className="account">
+      <CatalogSyncPanel />
+
       <CreateAccountForm onCreated={(created) => (setLink(created), reload())} onError={setError} />
 
       {link !== null && <LinkNotice link={link} onClose={() => setLink(null)} />}

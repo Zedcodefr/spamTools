@@ -71,6 +71,15 @@ export function accountOf(request: FastifyRequest): AccountView {
   return request.account;
 }
 
+/** Compte connecté, administrateur. */
+export function adminOf(request: FastifyRequest): AccountView {
+  const account = accountOf(request);
+  if (account.role !== 'admin') {
+    throw new ForbiddenError('Réservé aux administrateurs');
+  }
+  return account;
+}
+
 export function setSessionCookie(reply: FastifyReply, container: Container, token: string, expiresAt: Date): void {
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',
